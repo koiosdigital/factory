@@ -6,38 +6,68 @@
         <UButton @click="connect" :disabled="state !== State.DISCONNECTED">
           Connect
         </UButton>
-        <UButton
-          @click="reset"
-          :disabled="state !== State.CONNECTED"
-          color="warning"
-        >
-          Reset
-        </UButton>
-        <UButton
-          @click="disconnect"
-          :disabled="state !== State.CONNECTED"
-          color="error"
-        >
-          Disconnect
-        </UButton>
       </div>
       <div v-if="state === State.DISCONNECTED">
-        <p class="text-gray-500">Please connect to a device.</p>
+        <UAlert
+          color="neutral"
+          title="Waiting"
+          icon="lucide:info"
+          description="Please connect a device."
+        />
       </div>
       <div v-else-if="state === State.CONNECTING">
-        <p class="text-gray-500">Connecting...</p>
+        <UAlert
+          color="neutral"
+          title="Connecting"
+          icon="lucide:info"
+          description="Please wait for the connection to be established."
+        />
       </div>
-      <div v-else-if="state === State.CONNECTED">
-        <p class="text-gray-500">Connected to device.</p>
-        <p class="text-gray-500">
-          Crypto Status: {{ cryptoStatus }} ({{ cryptoStatusStr }})
-        </p>
-        <p class="text-gray-500">
-          KD Console: {{ kdConsoleReady ? "Ready" : "Not Ready" }}
-        </p>
+      <div v-else-if="state === State.CONNECTED" class="flex flex-col gap-4">
+        <UAlert
+          color="success"
+          title="Connected"
+          icon="lucide:check"
+          description="You are connected to the device."
+        />
+        <USeparator />
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <UBadge color="success" size="sm">
+              USB ID: 0x{{ port?.getInfo().usbVendorId?.toString(16) }} : 0x{{
+                port?.getInfo().usbProductId?.toString(16)
+              }}
+            </UBadge>
+            <UBadge :color="cryptoStatus >= 2 ? 'success' : 'error'" size="sm">
+              Has CSR: {{ cryptoStatus >= 2 ? "Yes" : "No" }}
+            </UBadge>
+            <UBadge :color="cryptoStatus >= 3 ? 'success' : 'error'" size="sm">
+              Has Device Certificate: {{ cryptoStatus >= 3 ? "Yes" : "No" }}
+            </UBadge>
+            <UBadge :color="kdConsoleReady ? 'success' : 'warning'" size="sm">
+              KD Console: {{ kdConsoleReady ? "Ready" : "Not Ready" }}
+            </UBadge>
+          </div>
+          <div class="flex items-center gap-4">
+            <UButton
+              @click="reset"
+              :disabled="state !== State.CONNECTED"
+              color="warning"
+            >
+              Reset
+            </UButton>
+            <UButton
+              @click="disconnect"
+              :disabled="state !== State.CONNECTED"
+              color="error"
+            >
+              Disconnect
+            </UButton>
+          </div>
+        </div>
         <USeparator />
         <div v-if="cryptoStatus === 1">
-          <p class="text-gray-500">
+          <p class="text-gray-300">
             Please wait for the key generation to finish. This may take a few
             minutes.
           </p>
@@ -46,12 +76,12 @@
           <UButton @click="signCSR" :disabled="signingCSR"
             >Generate Certificate</UButton
           >
-          <p class="text-gray-500" v-if="signingCSR">
+          <p class="text-gray-300" v-if="signingCSR">
             Please wait for the CSR to be signed. This may take a few seconds.
           </p>
         </div>
         <div v-if="cryptoStatus === 3">
-          <p class="text-gray-500">
+          <p class="text-gray-300">
             Device certificate is valid. Please disconnect and re-connect to
             program the device.
           </p>
@@ -100,6 +130,7 @@ let reader: AsyncGenerator<Uint8Array> | undefined = undefined;
 let buffer = new Uint8Array(0);
 
 const handleLine = async (line: string) => {
+  console.log(line);
   if (line.includes("kd>") && !kdConsoleReady.value) {
     kdConsoleReady.value = true;
   }
@@ -136,9 +167,7 @@ const handleLine = async (line: string) => {
         reader.readAsText(blob);
         reader.onload = async () => {
           const text = reader.result as string;
-          console.log(text);
           const base64 = btoa(text);
-          console.log(base64);
 
           const commandChunks = [];
           const chunkSize = 64;
@@ -156,10 +185,11 @@ const handleLine = async (line: string) => {
         };
 
         signingCSR.value = false;
+        cryptoStatus.value = 0;
       }
     }
   } catch {
-    console.log(line);
+    //ignore
   }
 };
 
@@ -190,7 +220,7 @@ const consoleLoop = async () => {
     }
 
     //if kdconsole is ready, send a command
-    if (kdConsoleReady.value && cryptoStatus.value <= 1) {
+    if (kdConsoleReady.value && cryptoStatus.value < 2) {
       const command = "crypto_status\n";
       const commandBuffer = new TextEncoder().encode(command);
       await transport.value.write(commandBuffer);
@@ -230,10 +260,19 @@ const disconnect = async () => {
     consoleInterval.value = undefined;
   }
   state.value = State.DISCONNECTED;
+  kdConsoleReady.value = false;
+  cryptoStatus.value = 0;
+  signingCSR.value = false;
+  buffer = new Uint8Array(0);
+  reader = undefined;
 };
 
 const reset = async () => {
   if (transport.value) {
+    kdConsoleReady.value = false;
+    cryptoStatus.value = 0;
+    signingCSR.value = false;
+    buffer = new Uint8Array(0);
     await transport.value.setRTS(true);
     await new Promise((resolve) => setTimeout(resolve, 100));
     await transport.value.setRTS(false);

@@ -3,6 +3,7 @@ export type Project = {
     name: string;
     supports_variants: boolean;
     repository_slug: string;
+    variants: ProjectVariant[] | null;
 }
 
 export type ProjectVariant = {

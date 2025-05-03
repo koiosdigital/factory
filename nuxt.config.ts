@@ -1,6 +1,13 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import tailwindcss from "@tailwindcss/vite";
 
+const getAuthBaseURL = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://factory.koiosdigital.net';
+  }
+  return 'http://localhost:3000';
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
@@ -20,9 +27,9 @@ export default defineNuxtConfig({
         clientSecret: '',
         exposeAccessToken: true,
         scope: ['openid', 'profile', 'email', 'roles'],
-        redirectUri: 'https://factory.koiosdigital.net/auth/keycloak/callback',
+        redirectUri: `${getAuthBaseURL()}/auth/keycloak/callback`,
         userNameClaim: 'preferred_username',
-        logoutRedirectUri: 'https://factory.koiosdigital.net',
+        logoutRedirectUri: `${getAuthBaseURL()}`,
       }
     },
   },
