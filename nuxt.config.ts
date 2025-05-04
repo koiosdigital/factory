@@ -15,7 +15,8 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/icon',
     '@nuxt/ui-pro',
-    'nuxt-oidc-auth'
+    'nuxt-oidc-auth',
+    '@pinia/nuxt'
   ],
   css: ['~/assets/css/main.css'],
   oidc: {

@@ -10,3 +10,10 @@ export type ProjectVariant = {
     name: string;
     url: string;
 }
+
+export type FlashItem = {
+    offset: string;
+    file: string;
+};
+
+export type FirmwareManifest = FlashItem[];
