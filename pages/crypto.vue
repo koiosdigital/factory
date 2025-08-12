@@ -131,10 +131,10 @@ let buffer = new Uint8Array(0);
 
 const handleLine = async (line: string) => {
   console.log(line);
-  if (line.includes("kd>") && !kdConsoleReady.value) {
+  if (line.includes("tty>") && !kdConsoleReady.value) {
     kdConsoleReady.value = true;
   }
-  if (line.includes("kd>") && kdConsoleReady.value) {
+  if (line.includes("tty>") && kdConsoleReady.value) {
     return;
   }
   try {

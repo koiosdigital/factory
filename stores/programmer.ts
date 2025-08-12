@@ -209,7 +209,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
             consoleAbortController = null;
         }
 
-        if (line.includes("kd>") && kdConsoleReady.value === false) {
+        if (line.includes("tty>") && kdConsoleReady.value === false) {
             kdConsoleReady.value = true;
             cryptoStatusInterval = setInterval(cryptoStatusCheckLoop, 1000);
         }
