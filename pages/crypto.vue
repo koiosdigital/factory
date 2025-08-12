@@ -181,9 +181,6 @@ const handleLine = async (line: string) => {
 
           console.log("Sending command chunks:", commandChunks);
 
-          await transport.value?.flushInput();
-          await transport.value?.flushOutput();
-
           for (const chunk of commandChunks) {
             const commandBuffer = new TextEncoder().encode(chunk);
             await transport.value?.write(commandBuffer);
