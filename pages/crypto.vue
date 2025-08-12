@@ -169,6 +169,8 @@ const handleLine = async (line: string) => {
           const text = reader.result as string;
           const base64 = btoa(text);
 
+          console.log("Device certificate:", base64);
+
           const commandChunks = [];
           const chunkSize = 64;
           const command = `set_device_cert ${base64}\n`;
@@ -176,6 +178,8 @@ const handleLine = async (line: string) => {
           for (let i = 0; i < command.length; i += chunkSize) {
             commandChunks.push(command.slice(i, i + chunkSize));
           }
+
+          console.log("Sending command chunks:", commandChunks);
 
           await transport.value?.flushInput();
           await transport.value?.flushOutput();
@@ -192,7 +196,7 @@ const handleLine = async (line: string) => {
       }
     }
   } catch {
-    //ignore
+    console.error("Failed to parse line:", line);
   }
 };
 
