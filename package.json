@@ -6,8 +6,11 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
+    "lint": "nuxi prepare && eslint .",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxi prepare && nuxi typecheck",
+    "api:generate": "pnpm exec openapi-typescript https://firmware.api.koiosdigital.net/swagger.json -o types/firmware-api.ts && pnpm exec openapi-typescript https://provisioning.api.koiosdigital.net/swagger.json -o types/provisioning-api.ts"
   },
   "dependencies": {
     "@nuxt/eslint": "1.3.0",
@@ -21,6 +24,7 @@
     "esptool-js": "^0.5.4",
     "nuxt": "^3.17.1",
     "nuxt-oidc-auth": "1.0.0-beta.5",
+    "openapi-fetch": "^0.15.0",
     "pinia": "^3.0.2",
     "tailwindcss": "^4.1.5",
     "typescript": "^5.8.3",
@@ -29,6 +33,8 @@
   },
   "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39",
   "devDependencies": {
-    "@types/w3c-web-serial": "^1.0.8"
+    "@types/node": "^24.10.4",
+    "@types/w3c-web-serial": "^1.0.8",
+    "openapi-typescript": "^7.10.1"
   }
 }

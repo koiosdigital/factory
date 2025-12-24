@@ -3,17 +3,17 @@ import { BlobReader, BlobWriter, ZipReader } from "@zip.js/zip.js";
 import { ESPLoader, Transport, type FlashOptions, type IEspLoaderTerminal } from "esptool-js";
 import type { FirmwareManifest } from "~/types/koios_apis";
 import { AutoConnectResult, CryptoState, FirmwareFlashState, SerialState } from "~/types/programmer";
-
-const matchedVendorIds = [
-    0x303A, // Espressif
-]
+import { useFirmwareApi } from "~/lib/api/firmware";
+import { buildVendorFilters, findFirstAuthorizedMatchingPort } from "~/lib/serial/ports";
+import { useCryptoStore } from "~/stores/crypto";
 
 const matchUserCodeStart = "Pro cpu start user code";
 const matchNotFlashed = "invalid header: 0x";
 
 export const useProgrammerStore = defineStore('programmer', () => {
     const toast = useToast();
-    const user = useOidcAuth();
+    const firmwareApi = useFirmwareApi();
+    const crypto = useCryptoStore();
 
     const serialConnectionState = ref<SerialState>(SerialState.DISCONNECTED);
     const firmwareFlashState = ref<FirmwareFlashState>(FirmwareFlashState.NOT_FLASHED);
@@ -31,15 +31,58 @@ export const useProgrammerStore = defineStore('programmer', () => {
     let terminalActive = false;
     let consoleBusy = false;
     let consoleAbortController: AbortController | null = null;
-    let uploadedDSParams = false;
 
-    const connectToDevice = async (force: boolean = false) => {
+    let opChain: Promise<unknown> = Promise.resolve();
+    let connectionEpoch = 0;
+    let writeChain: Promise<void> = Promise.resolve();
+
+    const bumpEpoch = () => {
+        connectionEpoch += 1;
+        return connectionEpoch;
+    };
+
+    const runExclusive = async <T>(fn: (epoch: number) => Promise<T>): Promise<T> => {
+        const task = opChain.then(() => fn(connectionEpoch));
+        opChain = task.catch(() => undefined);
+        return task;
+    };
+
+    const enqueueWrite = async (buffer: Uint8Array, epoch: number) => {
+        writeChain = writeChain
+            .then(async () => {
+                if (epoch !== connectionEpoch) return;
+                if (!transport) return;
+                await transport.write(buffer);
+            })
+            .catch(() => undefined);
+        return writeChain;
+    };
+
+    const clearCryptoStatusInterval = () => {
+        if (cryptoStatusInterval) {
+            clearInterval(cryptoStatusInterval);
+            cryptoStatusInterval = null;
+        }
+    };
+
+    const stopConsole = () => {
+        clearCryptoStatusInterval();
+        kdConsoleReady.value = false;
+        consoleAbortController?.abort();
+        consoleAbortController = null;
+        consoleBusy = false;
+    };
+
+    const connectToDevice = async (force: boolean = false) => runExclusive(async () => {
         if (serialConnectionState.value === SerialState.CONNECTED && !force) return;
 
         if (!port) {
             showError('No port selected');
             return;
         }
+
+        bumpEpoch();
+        stopConsole();
 
         serialConnectionState.value = SerialState.CONNECTING;
 
@@ -75,24 +118,28 @@ export const useProgrammerStore = defineStore('programmer', () => {
 
         if (!force) {
             firmwareFlashState.value = FirmwareFlashState.DETERMINING;
-
             await enterROM();
         }
 
         serialConnectionState.value = SerialState.CONNECTED;
 
         if (!force) {
-            //by default, we do not want to be in the ROM
             await resetChip();
-            startConsole();
+            void startConsole();
         }
-    }
+    });
 
-    const disconnectFromDevice = async (force: boolean = false) => {
-        if (serialConnectionState.value !== SerialState.CONNECTED) return;
-        consoleAbortController?.abort();
+    const disconnectFromDevice = async (force: boolean = false) => runExclusive(async () => {
+        if (serialConnectionState.value === SerialState.DISCONNECTED) return;
 
-        if (transport) await transport.disconnect();
+        bumpEpoch();
+        stopConsole();
+
+        try {
+            if (transport) await transport.disconnect();
+        } catch {
+            // ignore
+        }
 
         transport = null;
         loader = null;
@@ -110,23 +157,17 @@ export const useProgrammerStore = defineStore('programmer', () => {
         rom.value = "";
         mac.value = "";
         terminalActive = false;
-    }
+    });
 
     const attemptDeviceAutoConnect = async (): Promise<AutoConnectResult> => {
         if (serialConnectionState.value === SerialState.CONNECTED) return AutoConnectResult.FAILED;
         if (!import.meta.client) return AutoConnectResult.FAILED;
 
-        const ports = await navigator.serial.getPorts();
-
-        if (ports.length > 0) {
-            for (const _port of ports) {
-                const info = _port.getInfo();
-                if (info.usbVendorId && matchedVendorIds.includes(info.usbVendorId)) {
-                    port = _port;
-                    connectToDevice();
-                    return AutoConnectResult.SUCCESS;
-                }
-            }
+        const authorized = await findFirstAuthorizedMatchingPort();
+        if (authorized) {
+            port = authorized;
+            await connectToDevice();
+            return AutoConnectResult.SUCCESS;
         }
 
         return AutoConnectResult.NO_AUTHORIZED_PORTS;
@@ -136,14 +177,12 @@ export const useProgrammerStore = defineStore('programmer', () => {
         if (serialConnectionState.value === SerialState.CONNECTED) return;
         if (!import.meta.client) return;
 
-        const filters = matchedVendorIds.map(vendorId => ({ usbVendorId: vendorId }));
-
         try {
             const _port = await navigator.serial.requestPort({
-                filters
+                filters: buildVendorFilters(),
             });
             port = _port;
-            connectToDevice();
+            await connectToDevice();
         } catch {
             showError('No port selected');
         }
@@ -155,12 +194,19 @@ export const useProgrammerStore = defineStore('programmer', () => {
             return;
         }
 
+        stopConsole();
+        const epoch = connectionEpoch;
+
         const reader = transport.rawRead();
         consoleAbortController = new AbortController();
 
         try {
             let buffer = new Uint8Array(0);
             for await (const value of reader) {
+                if (epoch !== connectionEpoch) {
+                    break;
+                }
+
                 if (consoleAbortController.signal.aborted) {
                     break;
                 }
@@ -173,7 +219,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
                         const _line = buffer.slice(0, i);
                         buffer = buffer.slice(i + 1);
                         const line = new TextDecoder().decode(_line);
-                        handleConsoleLine(line);
+                        void handleConsoleLine(line, epoch);
                     }
                 }
             }
@@ -185,7 +231,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
     let cryptoStatusInterval: NodeJS.Timeout | null = null;
     const cryptoStatusCheckLoop = async () => {
         if (!transport) {
-            clearInterval(cryptoStatusInterval!);
+            clearCryptoStatusInterval();
             return;
         }
 
@@ -195,26 +241,25 @@ export const useProgrammerStore = defineStore('programmer', () => {
 
         const command = "crypto_status\n";
         const commandBuffer = new TextEncoder().encode(command);
-        await transport.write(commandBuffer);
+        await enqueueWrite(commandBuffer, connectionEpoch);
     }
 
-    const handleConsoleLine = async (line: string) => {
+    const handleConsoleLine = async (line: string, epoch: number) => {
+        if (epoch !== connectionEpoch) return;
+
         if (line.includes(matchUserCodeStart)) {
             firmwareFlashState.value = FirmwareFlashState.FLASHED;
         }
 
         if (line.includes(matchNotFlashed)) {
             firmwareFlashState.value = FirmwareFlashState.NOT_FLASHED;
-            consoleAbortController?.abort();
-            consoleAbortController = null;
+            stopConsole();
         }
 
         if (line.includes("tty>") && kdConsoleReady.value === false) {
             kdConsoleReady.value = true;
             cryptoStatusInterval = setInterval(cryptoStatusCheckLoop, 1000);
         }
-
-        console.log(line);
 
         try {
             const json = JSON.parse(line)
@@ -226,17 +271,17 @@ export const useProgrammerStore = defineStore('programmer', () => {
                     if (cryptoState.value === CryptoState.VALID_CSR) {
                         const command = "get_csr\n";
                         const commandBuffer = new TextEncoder().encode(command);
-                        await transport?.write(commandBuffer);
+                        await enqueueWrite(commandBuffer, epoch);
                     } else if (cryptoState.value === CryptoState.VALID_CERT) {
                         toast.add({
                             title: 'Success',
                             description: 'Device is provisioned',
                             color: 'success',
                         })
-                        disconnectFromDevice();
+                        void disconnectFromDevice();
                     }
                 } else if (json.csr) {
-                    signCSR(json.csr);
+                    void signCSR(json.csr, epoch);
                 }
             }
         } catch {
@@ -244,56 +289,20 @@ export const useProgrammerStore = defineStore('programmer', () => {
         }
     }
 
-    const signCSR = async (csr: string) => {
+    const signCSR = async (csr: string, epoch: number) => {
+        if (epoch !== connectionEpoch) return;
+
         consoleBusy = true;
-        const csrText = atob(csr);
-
-        //create formdata
-        const formData = new FormData();
-        formData.append("csr", new Blob([csrText]), "csr.pem");
-
-        const response = await fetch(
-            "https://provisioning.api.koiosdigital.net/v1/factory/provision",
-            {
-                method: "POST",
-                body: formData,
-                headers: {
-                    Authorization: `Bearer ${user.user.value!.accessToken}`,
-                },
-            }
-        );
-
-        if (!response.ok) {
-            showError("Failed to sign CSR");
+        try {
+            await crypto.provisionFromCsr({
+                csrBase64: csr,
+                write: (data) => enqueueWrite(data, epoch),
+                isStale: () => epoch !== connectionEpoch,
+            });
+        } finally {
             consoleBusy = false;
-            return;
         }
-
-        //response will be a file, extract text and encode as base64
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.readAsText(blob);
-        reader.onload = async () => {
-            const text = reader.result as string;
-            const base64 = btoa(text);
-
-            const commandChunks = [];
-            const chunkSize = 64;
-            const command = `set_device_cert ${base64}\n`;
-
-            for (let i = 0; i < command.length; i += chunkSize) {
-                commandChunks.push(command.slice(i, i + chunkSize));
-            }
-
-            for (const chunk of commandChunks) {
-                const commandBuffer = new TextEncoder().encode(chunk);
-                await transport?.write(commandBuffer);
-                await new Promise((resolve) => setTimeout(resolve, 50));
-            }
-
-            consoleBusy = false;
-        };
-    }
+    };
 
     const resetChip = async () => {
         if (!transport) {
@@ -317,15 +326,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
             return;
         }
 
-        if (consoleAbortController) {
-            consoleAbortController.abort();
-            consoleAbortController = null;
-        }
-
-        if (rom.value !== "") {
-            await disconnectFromDevice(true);
-            await connectToDevice(true);
-        }
+        stopConsole();
 
         setTerminalActive(true);
 
@@ -361,7 +362,12 @@ export const useProgrammerStore = defineStore('programmer', () => {
         }
     }
 
-    const flashFirmware = async (manifest_url: string) => {
+    const flashFirmware = async (manifest_url: string) => runExclusive(async () => {
+        if (!manifest_url) {
+            showError('No firmware variant selected');
+            return;
+        }
+
         await enterROM();
 
         if (!loader) {
@@ -372,13 +378,19 @@ export const useProgrammerStore = defineStore('programmer', () => {
         firmwareFlashState.value = FirmwareFlashState.FLASHING;
 
         // read contents of firmware into memory
-        const url = `https://firmware.api.koiosdigital.net/mirror/${encodeURIComponent(
-            manifest_url
-        )}`;
-        const res = await fetch(url);
+        const { data: firmwareZip, error, response } = await firmwareApi.GET("/mirror/{encodedURL}", {
+            params: {
+                path: {
+                    encodedURL: encodeURIComponent(manifest_url),
+                },
+            },
+            parseAs: "blob",
+        });
 
-        // get binary string from response body
-        const firmwareZip = await res.blob();
+        if (error || !response.ok || !firmwareZip) {
+            showError('Failed to download firmware');
+            return;
+        }
 
         const reader = new ZipReader(new BlobReader(firmwareZip));
         const entries = await reader.getEntries();
@@ -445,8 +457,8 @@ export const useProgrammerStore = defineStore('programmer', () => {
         await loader.after();
         await resetChip();
         firmwareFlashState.value = FirmwareFlashState.FLASHED;
-        startConsole();
-    }
+        void startConsole();
+    });
 
     return {
         serialConnectionState,

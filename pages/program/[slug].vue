@@ -5,11 +5,11 @@
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">Flasher</h2>
           <div class="flex gap-4 items-center">
-            <UBadge color="info">Project: {{ project?.slug }}</UBadge>
-            <UBadge color="info" v-if="selectedVariant">{{
+            <UBadge color="info">Project: {{ slug }}</UBadge>
+            <UBadge v-if="selectedVariant" color="info">{{
               selectedVariant
             }}</UBadge>
-            <UBadge color="warning" v-else>Variant: Unselected</UBadge>
+            <UBadge v-else color="warning">Variant: Unselected</UBadge>
           </div>
         </div>
         <USeparator />
@@ -39,7 +39,7 @@
 
           <p>Click button below if device does not automatically connect</p>
 
-          <UButton @click="programmer.openPortSelection" size="lg"
+          <UButton size="lg" @click="programmer.openPortSelection"
             >Connect</UButton
           >
         </template>
@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Project } from "~/types/koios_apis";
+import type { components } from "~/types/firmware-api";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import {
@@ -87,20 +87,31 @@ import {
   FirmwareFlashState,
   CryptoState,
 } from "~/types/programmer";
-import { select } from "#build/ui";
+import { useFirmwareApi } from "~/lib/api/firmware";
 
 const slug = useRoute().params.slug as string;
-const { data: project } = useFetch<Project>(
-  "https://firmware.api.koiosdigital.net/projects/" + slug
+type ProjectVariantsResponse = components["schemas"]["ProjectVariantsResponse"];
+
+const firmware = useFirmwareApi();
+
+const { data: project } = useAsyncData<ProjectVariantsResponse>(
+  `project:${slug}`,
+  async () => {
+    const { data, error } = await firmware.GET("/projects/{slug}", {
+      params: { path: { slug } },
+    });
+    if (error || !data) throw error;
+    return data;
+  }
 );
 
 const selectedVariant = ref<string | null>(null);
 
 const variantOptions = computed(() => {
-  if (project.value && project.value.variants) {
+  if (project.value?.variants?.length) {
     return project.value.variants.map((variant) => ({
-      label: variant.name,
-      value: variant.url,
+      label: variant,
+      value: variant,
     }));
   }
   return [];

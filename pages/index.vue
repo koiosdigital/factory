@@ -15,9 +15,16 @@
 </template>
 
 <script setup lang="ts">
-import type { Project } from "~/types/koios_apis";
+import type { components } from "~/types/firmware-api";
+import { useFirmwareApi } from "~/lib/api/firmware";
 
-const { data: projects } = useFetch<Project[]>(
-  "https://firmware.api.koiosdigital.net/projects"
-);
+type Project = components["schemas"]["Project"];
+
+const firmware = useFirmwareApi();
+
+const { data: projects } = useAsyncData<Project[]>("projects", async () => {
+  const { data, error } = await firmware.GET("/projects");
+  if (error) throw error;
+  return data;
+});
 </script>

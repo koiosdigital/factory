@@ -11,6 +11,12 @@ const getAuthBaseURL = () => {
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
+  runtimeConfig: {
+    public: {
+      firmwareApiBase: process.env.NUXT_PUBLIC_FIRMWARE_API_BASE || 'https://firmware.api.koiosdigital.net',
+      provisioningApiBase: process.env.NUXT_PUBLIC_PROVISIONING_API_BASE || 'https://provisioning.api.koiosdigital.net',
+    },
+  },
   modules: [
     '@nuxt/eslint',
     '@nuxt/icon',
@@ -23,7 +29,7 @@ export default defineNuxtConfig({
     providers: {
       keycloak: {
         audience: 'account',
-        baseUrl: 'https://auth.koiosdigital.net/realms/kd-prod',
+        baseUrl: 'https://sso.koiosdigital.net/realms/kd-prod',
         clientId: 'factory',
         clientSecret: '',
         exposeAccessToken: true,
@@ -31,8 +37,11 @@ export default defineNuxtConfig({
         redirectUri: `${getAuthBaseURL()}/auth/keycloak/callback`,
         userNameClaim: 'preferred_username',
         logoutRedirectUri: `${getAuthBaseURL()}`,
+        pkce: true,
+
       }
     },
+    session: { cookie: { sameSite: 'lax' } }
   },
   vite: {
     plugins: [
