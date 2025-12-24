@@ -123,8 +123,10 @@
 </template>
 
 <script setup lang="ts">
-import { SerialState, CryptoState } from "~/types/programmer";
-import { useCryptoStore } from "~/stores/crypto";
+import { computed, onBeforeUnmount } from "vue";
+
+import { useCryptoStore } from "@/stores/crypto";
+import { CryptoState, SerialState } from "@/types/programmer";
 
 const crypto = useCryptoStore();
 

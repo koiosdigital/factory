@@ -12,8 +12,11 @@ export const getMatchedVendorIds = () => matchedVendorIds.slice();
 export const buildVendorFilters = (): SerialPortFilter[] =>
     matchedVendorIds.map((usbVendorId) => ({ usbVendorId }));
 
+export const isSerialSupported = (): boolean =>
+    typeof navigator !== 'undefined' && 'serial' in navigator
+
 export const findFirstAuthorizedMatchingPort = async (): Promise<SerialPort | null> => {
-    if (!import.meta.client) return null;
+    if (!isSerialSupported()) return null;
 
     const ports = await navigator.serial.getPorts();
     for (const port of ports) {
@@ -26,7 +29,7 @@ export const findFirstAuthorizedMatchingPort = async (): Promise<SerialPort | nu
 };
 
 export const requestMatchingPort = async (): Promise<SerialPort> => {
-    if (!import.meta.client) {
+    if (!isSerialSupported()) {
         throw new Error("Serial is only available in the browser");
     }
 

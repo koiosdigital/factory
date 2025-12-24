@@ -1,8 +1,12 @@
-eimport { defineStore } from "pinia";
-import { Transport } from "esptool-js";
-import { SerialState, CryptoState } from "~/types/programmer";
-import { requestMatchingPort } from "~/lib/serial/ports";
-import { useProvisioningApi } from "~/lib/api/provisioning";
+import { defineStore } from 'pinia'
+import { Transport } from 'esptool-js'
+import { ref, shallowRef } from 'vue'
+import { useToast } from '@nuxt/ui/composables'
+
+import { useProvisioningApi } from '@/lib/api/provisioning'
+import { isSerialSupported, requestMatchingPort } from '@/lib/serial/ports'
+import { useAuthStore } from '@/stores/auth'
+import { CryptoState, SerialState } from '@/types/programmer'
 
 const ttyPrompt = "tty>";
 
@@ -11,9 +15,9 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
-export const useCryptoStore = defineStore("crypto", () => {
+export const useCryptoStore = defineStore('crypto', () => {
     const toast = useToast();
-    const { user } = useOidcAuth();
+    const auth = useAuthStore();
     const provisioningApi = useProvisioningApi();
 
     const serialConnectionState = ref<SerialState>(SerialState.DISCONNECTED);
@@ -99,9 +103,9 @@ export const useCryptoStore = defineStore("crypto", () => {
         write: (data: Uint8Array) => Promise<void>;
         isStale?: () => boolean;
     }) => {
-        const accessToken = user.value?.accessToken;
+        const accessToken = auth.getAccessToken();
         if (!accessToken) {
-            showError("Not authenticated");
+            showError('Not authenticated');
             return;
         }
 
@@ -240,7 +244,7 @@ export const useCryptoStore = defineStore("crypto", () => {
 
     const connect = async () => {
         if (serialConnectionState.value !== SerialState.DISCONNECTED) return;
-        if (!import.meta.client) return;
+        if (!isSerialSupported()) return;
 
         serialConnectionState.value = SerialState.CONNECTING;
 

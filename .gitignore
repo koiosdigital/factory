@@ -17,6 +17,9 @@ logs
 .DS_Store
 .fleet
 .idea
+auto-imports.d.ts
+components.d.ts
+.vite
 
 # Local env files
 .env

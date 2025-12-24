@@ -30,10 +30,22 @@
             Crypto Engine: {{ cryptoStateBadge.text }}
           </UBadge>
         </div>
+        <UAlert
+          v-if="loadError"
+          class="mt-4"
+          color="error"
+          title="Unable to load project"
+          :description="loadError"
+        />
       </UPageCard>
       <UPageCard variant="subtle" class="w-full">
+        <div v-if="loading" class="py-6 flex justify-center">
+          <UProgress />
+        </div>
         <template
-          v-if="programmer.serialConnectionState === SerialState.DISCONNECTED"
+          v-else-if="
+            programmer.serialConnectionState === SerialState.DISCONNECTED
+          "
         >
           <h2 class="text-lg font-semibold">No Device Connected</h2>
 
@@ -79,33 +91,57 @@
 </template>
 
 <script setup lang="ts">
-import type { components } from "~/types/firmware-api";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import {
-  SerialState,
-  FirmwareFlashState,
-  CryptoState,
-} from "~/types/programmer";
-import { useFirmwareApi } from "~/lib/api/firmware";
 
-const slug = useRoute().params.slug as string;
+import { useFirmwareApi } from "@/lib/api/firmware";
+import { useProgrammerStore } from "@/stores/programmer";
+import type { components } from "@/types/firmware-api";
+import {
+  CryptoState,
+  FirmwareFlashState,
+  SerialState,
+} from "@/types/programmer";
+
 type ProjectVariantsResponse = components["schemas"]["ProjectVariantsResponse"];
 
+const route = useRoute();
+const slug = computed(() => route.params.slug as string);
 const firmware = useFirmwareApi();
+const programmer = useProgrammerStore();
 
-const { data: project } = useAsyncData<ProjectVariantsResponse>(
-  `project:${slug}`,
-  async () => {
-    const { data, error } = await firmware.GET("/projects/{slug}", {
-      params: { path: { slug } },
-    });
-    if (error || !data) throw error;
-    return data;
-  }
-);
-
+const project = ref<ProjectVariantsResponse | null>(null);
+const loading = ref(false);
+const loadError = ref("");
 const selectedVariant = ref<string | null>(null);
+
+const fetchProject = async () => {
+  if (!slug.value) return;
+  loading.value = true;
+  loadError.value = "";
+
+  try {
+    const { data, error } = await firmware.GET("/projects/{slug}", {
+      params: { path: { slug: slug.value } },
+    });
+
+    if (error || !data) {
+      throw error ?? new Error("Project not found");
+    }
+
+    project.value = data;
+    selectedVariant.value = null;
+  } catch (error) {
+    loadError.value =
+      error instanceof Error ? error.message : "Failed to load project";
+  } finally {
+    loading.value = false;
+  }
+};
+
+watch(slug, fetchProject, { immediate: true });
 
 const variantOptions = computed(() => {
   if (project.value?.variants?.length) {
@@ -116,8 +152,6 @@ const variantOptions = computed(() => {
   }
   return [];
 });
-
-const programmer = useProgrammerStore();
 
 const serialConnectionBadge = computed<{
   color: "success" | "error" | "warning" | "neutral" | "info";

@@ -1,14 +1,22 @@
-import type { Terminal } from "@xterm/xterm";
-import { BlobReader, BlobWriter, ZipReader } from "@zip.js/zip.js";
-import { ESPLoader, Transport, type FlashOptions, type IEspLoaderTerminal } from "esptool-js";
-import type { FirmwareManifest } from "~/types/koios_apis";
-import { AutoConnectResult, CryptoState, FirmwareFlashState, SerialState } from "~/types/programmer";
-import { useFirmwareApi } from "~/lib/api/firmware";
-import { buildVendorFilters, findFirstAuthorizedMatchingPort } from "~/lib/serial/ports";
-import { useCryptoStore } from "~/stores/crypto";
+import { ref } from 'vue'
+import { defineStore } from 'pinia'
+import type { Terminal } from '@xterm/xterm'
+import { BlobReader, BlobWriter, ZipReader } from '@zip.js/zip.js'
+import type { Entry, FileEntry } from '@zip.js/zip.js'
+import { ESPLoader, Transport, type FlashOptions, type IEspLoaderTerminal } from 'esptool-js'
+import { useToast } from '@nuxt/ui/composables'
+
+import { useFirmwareApi } from '@/lib/api/firmware'
+import { buildVendorFilters, findFirstAuthorizedMatchingPort, isSerialSupported } from '@/lib/serial/ports'
+import { useCryptoStore } from '@/stores/crypto'
+import type { FirmwareManifest } from '@/types/koios_apis'
+import { AutoConnectResult, CryptoState, FirmwareFlashState, SerialState } from '@/types/programmer'
 
 const matchUserCodeStart = "Pro cpu start user code";
 const matchNotFlashed = "invalid header: 0x";
+
+const isFileEntry = (entry: Entry | undefined): entry is FileEntry =>
+    Boolean(entry && entry.directory === false && typeof (entry as FileEntry).getData === 'function')
 
 export const useProgrammerStore = defineStore('programmer', () => {
     const toast = useToast();
@@ -161,7 +169,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
 
     const attemptDeviceAutoConnect = async (): Promise<AutoConnectResult> => {
         if (serialConnectionState.value === SerialState.CONNECTED) return AutoConnectResult.FAILED;
-        if (!import.meta.client) return AutoConnectResult.FAILED;
+        if (!isSerialSupported()) return AutoConnectResult.FAILED;
 
         const authorized = await findFirstAuthorizedMatchingPort();
         if (authorized) {
@@ -175,7 +183,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
 
     const openPortSelection = async () => {
         if (serialConnectionState.value === SerialState.CONNECTED) return;
-        if (!import.meta.client) return;
+        if (!isSerialSupported()) return;
 
         try {
             const _port = await navigator.serial.requestPort({
@@ -398,7 +406,7 @@ export const useProgrammerStore = defineStore('programmer', () => {
         const manifestEntry = entries.find(
             (entry) => entry.filename === "flash_files.json"
         );
-        if (!manifestEntry) {
+        if (!isFileEntry(manifestEntry)) {
             toast.add({
                 title: "Error",
                 description: "No manifest found in firmware zip",
@@ -407,9 +415,8 @@ export const useProgrammerStore = defineStore('programmer', () => {
             return;
         }
 
-        const manifest: FirmwareManifest = JSON.parse(
-            await (await manifestEntry.getData!(new BlobWriter())).text()
-        );
+        const manifestBlob = await manifestEntry.getData(new BlobWriter());
+        const manifest: FirmwareManifest = JSON.parse(await manifestBlob.text());
 
         const flashItems: {
             address: number;
@@ -423,12 +430,12 @@ export const useProgrammerStore = defineStore('programmer', () => {
                 (entry) => entry.filename === flashItem.file
             );
 
-            if (!binaryEntry) {
+            if (!isFileEntry(binaryEntry)) {
                 showError(`No binary entry found for ${flashItem.file} in firmware zip`)
                 return;
             }
 
-            const data = await binaryEntry.getData!(new BlobWriter());
+            const data = await binaryEntry.getData(new BlobWriter());
             const dataArray = new Uint8Array(await data.arrayBuffer());
             let dataString = "";
 
