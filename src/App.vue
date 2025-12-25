@@ -1,25 +1,23 @@
 <template>
   <UApp>
-    <UHeader title="Koios Factory">
-      <div class="flex items-center gap-4 w-full">
-        <UNavigationMenu :items="navItems" class="flex-1" />
-        <UButton
-          v-if="auth.isAuthenticated"
-          color="neutral"
-          variant="outline"
-          @click="auth.logout"
-        >
-          Logout
-        </UButton>
-        <UButton v-else color="primary" @click="auth.login"> Login </UButton>
-      </div>
-    </UHeader>
+    <AppHeader
+      :nav-items="navItems"
+      :is-authenticated="auth.isAuthenticated"
+      :loading="auth.initializing"
+      :user-name="userDisplayName"
+      @login="handleLogin"
+      @logout="handleLogout"
+    />
 
-    <UMain>
+    <UMain class="bg-slate-950 text-white min-h-screen">
       <RouterView />
     </UMain>
 
-    <UFooter />
+    <UFooter class="border-t border-white/10 bg-slate-950 text-white/60">
+      <div class="max-w-6xl mx-auto px-4 py-6 text-sm">
+        Built for the Koios factory floor · {{ new Date().getFullYear() }}
+      </div>
+    </UFooter>
   </UApp>
 </template>
 
@@ -27,6 +25,7 @@
 import { computed } from "vue";
 import { RouterView, useRoute } from "vue-router";
 
+import AppHeader from "@/components/layout/AppHeader.vue";
 import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
@@ -44,4 +43,11 @@ const navItems = computed(() => [
     active: route.path.startsWith("/crypto"),
   },
 ]);
+
+const userDisplayName = computed(
+  () => auth.user?.preferred_username ?? auth.user?.name ?? null
+);
+
+const handleLogin = () => auth.login();
+const handleLogout = () => auth.logout();
 </script>

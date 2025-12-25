@@ -1,91 +1,182 @@
 <template>
-  <UContainer>
-    <div class="w-full flex items-center justify-center mt-8 flex-col gap-4">
-      <UPageCard variant="subtle" class="w-full">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Flasher</h2>
-          <div class="flex gap-4 items-center">
-            <UBadge color="info">Project: {{ slug }}</UBadge>
-            <UBadge v-if="selectedVariant" color="info">{{
-              selectedVariant
-            }}</UBadge>
-            <UBadge v-else color="warning">Variant: Unselected</UBadge>
-          </div>
+  <UContainer class="py-8 space-y-6">
+    <UCard>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="space-y-1">
+          <p class="text-xs uppercase tracking-[0.3em] text-white/60">
+            Project
+          </p>
+          <h1 class="text-2xl font-semibold text-white">
+            {{ project?.name ?? slug }}
+          </h1>
+          <p class="text-sm text-white/60">
+            Prepare your Koios device for flashing and secure provisioning.
+          </p>
         </div>
-        <USeparator />
-        <div class="flex gap-4 items-center justify-start">
-          <UBadge
-            :color="serialConnectionBadge.color"
-            :icon="serialConnectionBadge.icon"
+        <div class="flex flex-wrap gap-3">
+          <UButton
+            color="primary"
+            variant="soft"
+            icon="lucide:plug"
+            :loading="autoConnecting"
+            @click="handleAutoConnect"
           >
-            Serial: {{ serialConnectionBadge.text }}
-          </UBadge>
-          <UBadge
-            :color="firmwareFlashBadge.color"
-            :icon="firmwareFlashBadge.icon"
-          >
-            Firmware: {{ firmwareFlashBadge.text }}
-          </UBadge>
-          <UBadge :color="cryptoStateBadge.color" :icon="cryptoStateBadge.icon">
-            Crypto Engine: {{ cryptoStateBadge.text }}
-          </UBadge>
-        </div>
-        <UAlert
-          v-if="loadError"
-          class="mt-4"
-          color="error"
-          title="Unable to load project"
-          :description="loadError"
-        />
-      </UPageCard>
-      <UPageCard variant="subtle" class="w-full">
-        <div v-if="loading" class="py-6 flex justify-center">
-          <UProgress />
-        </div>
-        <template
-          v-else-if="
-            programmer.serialConnectionState === SerialState.DISCONNECTED
-          "
-        >
-          <h2 class="text-lg font-semibold">No Device Connected</h2>
-
-          <p>Click button below if device does not automatically connect</p>
-
-          <UButton size="lg" @click="programmer.openPortSelection"
-            >Connect</UButton
-          >
-        </template>
-        <template
-          v-else-if="
-            programmer.firmwareFlashState === FirmwareFlashState.DETERMINING
-          "
-        >
-          <h2 class="text-lg font-semibold">Wait</h2>
-
-          <UAlert
+            Auto connect
+          </UButton>
+          <UButton
             color="neutral"
-            title="Wait"
-            description="Determining Firmware"
-          />
-        </template>
-        <template
-          v-else-if="
-            programmer.firmwareFlashState === FirmwareFlashState.NOT_FLASHED
-          "
+            variant="ghost"
+            icon="lucide:refresh-ccw"
+            :loading="loading"
+            @click="fetchProject"
+          >
+            Refresh metadata
+          </UButton>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-3 text-xs text-white/60">
+        <span
+          >{{ variantOptions.length }} firmware option{{
+            variantOptions.length === 1 ? "" : "s"
+          }}</span
         >
-          <template v-if="!selectedVariant">
-            <h2 class="text-lg font-semibold" size="lg">Select Variant</h2>
+        <span class="hidden sm:inline">•</span>
+        <span>Slug: {{ slug }}</span>
+      </div>
+    </UCard>
 
-            <UButton
-              v-for="variant of variantOptions"
-              :key="variant.label"
-              @click="doFlash(variant.value)"
-              >{{ variant.label }}</UButton
-            >
-          </template>
+    <div class="grid gap-4 md:grid-cols-3">
+      <StatusPill v-for="card in statusCards" :key="card.label" v-bind="card" />
+    </div>
+
+    <div v-if="loadError">
+      <UAlert
+        color="error"
+        title="Unable to load project"
+        :description="loadError"
+      />
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-[2fr,1fr]">
+      <UCard :ui="{ body: 'space-y-6' }">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Device workflow</h3>
+            <UBadge :color="connectionBadge.color">{{
+              connectionBadge.text
+            }}</UBadge>
+          </div>
         </template>
-        <div id="terminal" class="w-full" />
-      </UPageCard>
+
+        <section class="space-y-3">
+          <h4 class="text-sm font-medium text-white">Connection controls</h4>
+          <div class="flex flex-wrap gap-3">
+            <UButton
+              color="primary"
+              icon="lucide:plug"
+              :loading="connectionBusy"
+              :disabled="connected"
+              @click="programmer.openPortSelection"
+            >
+              Connect device
+            </UButton>
+            <UButton
+              color="warning"
+              variant="soft"
+              icon="lucide:rotate-ccw"
+              :disabled="!connected"
+              @click="programmer.resetChip"
+            >
+              Reset chip
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="lucide:plug-zap"
+              :disabled="!connected"
+              @click="handleDisconnect"
+            >
+              Disconnect
+            </UButton>
+          </div>
+          <p class="text-sm text-white/60">
+            Use auto connect for approved devices or manually select a serial
+            port. Reset the chip if the console becomes unresponsive.
+          </p>
+        </section>
+
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-medium text-white">Firmware variant</h4>
+            <UBadge variant="soft" color="info">
+              {{ selectedVariant ?? "No selection" }}
+            </UBadge>
+          </div>
+
+          <div v-if="loading" class="space-y-2">
+            <USkeleton class="h-10 w-full" />
+            <USkeleton class="h-10 w-3/4" />
+          </div>
+          <UAlert
+            v-else-if="!variantOptions.length"
+            color="warning"
+            title="No variants available"
+            description="This project has no published firmware variants yet."
+          />
+          <div v-else class="flex flex-wrap gap-2">
+            <UButton
+              v-for="variant in variantOptions"
+              :key="variant.value"
+              :color="selectedVariant === variant.value ? 'primary' : 'neutral'"
+              :variant="selectedVariant === variant.value ? 'solid' : 'ghost'"
+              class="rounded-full"
+              @click="selectVariant(variant.value)"
+            >
+              {{ variant.label }}
+            </UButton>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <UButton
+              color="primary"
+              icon="lucide:flashlight"
+              :disabled="!canFlash"
+              :loading="
+                programmer.firmwareFlashState === FirmwareFlashState.FLASHING
+              "
+              @click="handleFlash"
+            >
+              Flash firmware
+            </UButton>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="lucide:trash-2"
+              :disabled="!selectedVariant"
+              @click="selectedVariant = null"
+            >
+              Clear selection
+            </UButton>
+          </div>
+        </section>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Live console</h3>
+            <UBadge :color="connected ? 'success' : 'neutral'">
+              {{ connected ? "Streaming" : "Waiting" }}
+            </UBadge>
+          </div>
+        </template>
+        <div class="h-72 rounded-2xl border border-white/10 bg-black/80">
+          <div ref="terminalRef" class="h-full" />
+        </div>
+        <p class="mt-3 text-xs text-white/50">
+          Output mirrors the KD console whenever a device is connected.
+        </p>
+      </UCard>
     </div>
   </UContainer>
 </template>
@@ -95,15 +186,41 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { useToast } from "@nuxt/ui/composables";
 
+import StatusPill from "@/components/ui/StatusPill.vue";
 import { useFirmwareApi } from "@/lib/api/firmware";
 import { useProgrammerStore } from "@/stores/programmer";
 import type { components } from "@/types/firmware-api";
 import {
+  AutoConnectResult,
   CryptoState,
   FirmwareFlashState,
   SerialState,
 } from "@/types/programmer";
+
+type StatusColor =
+  | "success"
+  | "error"
+  | "warning"
+  | "neutral"
+  | "info"
+  | "primary";
+
+type StatusBadge = {
+  color: StatusColor;
+  icon: string;
+  text: string;
+  description: string;
+};
+
+type StatusCard = {
+  label: string;
+  value: string;
+  description?: string;
+  color?: StatusColor;
+  icon?: string;
+};
 
 type ProjectVariantsResponse = components["schemas"]["ProjectVariantsResponse"];
 
@@ -111,11 +228,14 @@ const route = useRoute();
 const slug = computed(() => route.params.slug as string);
 const firmware = useFirmwareApi();
 const programmer = useProgrammerStore();
+const toast = useToast();
 
 const project = ref<ProjectVariantsResponse | null>(null);
 const loading = ref(false);
 const loadError = ref("");
 const selectedVariant = ref<string | null>(null);
+const autoConnecting = ref(false);
+const terminalRef = ref<HTMLElement | null>(null);
 
 const fetchProject = async () => {
   if (!slug.value) return;
@@ -153,127 +273,207 @@ const variantOptions = computed(() => {
   return [];
 });
 
-const serialConnectionBadge = computed<{
-  color: "success" | "error" | "warning" | "neutral" | "info";
-  icon: string;
-  text: string;
-}>(() => {
+const serialConnectionBadge = computed<StatusBadge>(() => {
   switch (programmer.serialConnectionState) {
     case SerialState.CONNECTED:
       return {
         color: "success",
-        icon: "lucide-check-circle",
+        icon: "lucide:check-circle",
         text: "Connected",
+        description: "Serial link established",
       };
     case SerialState.DISCONNECTED:
       return {
         color: "error",
-        icon: "lucide-circle-x",
+        icon: "lucide:circle-off",
         text: "Disconnected",
+        description: "Awaiting USB pairing",
       };
     case SerialState.CONNECTING:
       return {
         color: "warning",
-        icon: "lucide-triangle-alert",
+        icon: "lucide:loader",
         text: "Connecting",
+        description: "Authorizing serial port",
       };
     default:
       return {
         color: "neutral",
-        icon: "lucide-info",
-        text: "Not Connected",
+        icon: "lucide:info",
+        text: "Unknown",
+        description: "Idle",
       };
   }
 });
 
-const firmwareFlashBadge = computed<{
-  color: "success" | "error" | "warning" | "neutral" | "info";
-  icon: string;
-  text: string;
-}>(() => {
+const firmwareFlashBadge = computed<StatusBadge>(() => {
   switch (programmer.firmwareFlashState) {
     case FirmwareFlashState.FLASHING:
       return {
         color: "warning",
-        icon: "lucide-triangle-alert",
+        icon: "lucide:flashlight",
         text: "Flashing",
+        description: "Writing images",
       };
     case FirmwareFlashState.FLASHED:
       return {
         color: "success",
-        icon: "lucide-check-circle",
+        icon: "lucide:check-circle",
         text: "Flashed",
+        description: "Firmware verified",
       };
     case FirmwareFlashState.NOT_FLASHED:
       return {
         color: "error",
-        icon: "lucide-circle-x",
-        text: "Not Flashed",
+        icon: "lucide:circle-off",
+        text: "Not flashed",
+        description: "Select a variant",
+      };
+    case FirmwareFlashState.DETERMINING:
+      return {
+        color: "info",
+        icon: "lucide:loader",
+        text: "Determining",
+        description: "Detecting ROM",
       };
     default:
       return {
         color: "neutral",
-        icon: "lucide-info",
-        text: "Not Flashed",
+        icon: "lucide:info",
+        text: "Pending",
+        description: "Awaiting action",
       };
   }
 });
 
-const cryptoStateBadge = computed<{
-  color: "success" | "error" | "warning" | "neutral" | "info";
-  icon: string;
-  text: string;
-}>(() => {
+const cryptoStateBadge = computed<StatusBadge>(() => {
   switch (programmer.cryptoState) {
-    case CryptoState.UNINITIALIZED:
-      return {
-        color: "neutral",
-        icon: "lucide-info",
-        text: "Uninitialized",
-      };
     case CryptoState.KEY_GENERATED:
       return {
         color: "warning",
-        icon: "lucide-triangle-alert",
-        text: "Key Generated",
+        icon: "lucide:key",
+        text: "Key generated",
+        description: "Waiting for CSR",
       };
     case CryptoState.VALID_CSR:
       return {
         color: "info",
-        icon: "lucide-info",
-        text: "Valid CSR",
+        icon: "lucide:shield-check",
+        text: "CSR ready",
+        description: "Sign via factory",
       };
     case CryptoState.VALID_CERT:
       return {
         color: "success",
-        icon: "lucide-check-circle",
-        text: "Valid Certificate",
+        icon: "lucide:badge-check",
+        text: "Provisioned",
+        description: "Device trusted",
       };
     default:
       return {
         color: "neutral",
-        icon: "lucide-info",
-        text: "Not Generated",
+        icon: "lucide:info",
+        text: "Uninitialized",
+        description: "Crypto pending",
       };
   }
 });
+
+const statusCards = computed<StatusCard[]>(() => [
+  {
+    label: "Serial link",
+    value: serialConnectionBadge.value.text,
+    description: serialConnectionBadge.value.description,
+    color: serialConnectionBadge.value.color,
+    icon: serialConnectionBadge.value.icon,
+  },
+  {
+    label: "Firmware",
+    value: firmwareFlashBadge.value.text,
+    description: firmwareFlashBadge.value.description,
+    color: firmwareFlashBadge.value.color,
+    icon: firmwareFlashBadge.value.icon,
+  },
+  {
+    label: "Crypto engine",
+    value: cryptoStateBadge.value.text,
+    description: cryptoStateBadge.value.description,
+    color: cryptoStateBadge.value.color,
+    icon: cryptoStateBadge.value.icon,
+  },
+]);
+
+const connectionBadge = computed(() => serialConnectionBadge.value);
+const connectionBusy = computed(
+  () => programmer.serialConnectionState === SerialState.CONNECTING
+);
+const connected = computed(
+  () => programmer.serialConnectionState === SerialState.CONNECTED
+);
+
+const canFlash = computed(
+  () =>
+    connected.value &&
+    Boolean(selectedVariant.value) &&
+    programmer.firmwareFlashState !== FirmwareFlashState.FLASHING &&
+    !loadError.value
+);
+
+const selectVariant = (value: string) => {
+  selectedVariant.value = value;
+};
+
+const handleFlash = async () => {
+  if (!selectedVariant.value) return;
+  await programmer.flashFirmware(selectedVariant.value);
+};
+
+const handleDisconnect = () => {
+  programmer.disconnectFromDevice();
+};
+
+const handleAutoConnect = async () => {
+  if (autoConnecting.value) return;
+  autoConnecting.value = true;
+  try {
+    const result = await programmer.attemptDeviceAutoConnect();
+    if (result === AutoConnectResult.SUCCESS) {
+      toast.add({
+        title: "Device connected",
+        description: "We reused a previously authorized serial port.",
+        color: "success",
+      });
+    } else if (result === AutoConnectResult.NO_AUTHORIZED_PORTS) {
+      toast.add({
+        title: "No authorized devices",
+        description: "Plug in a Koios board and try again.",
+        color: "warning",
+      });
+    }
+  } catch (error) {
+    toast.add({
+      title: "Auto connect failed",
+      description: error instanceof Error ? error.message : String(error),
+      color: "error",
+    });
+  } finally {
+    autoConnecting.value = false;
+  }
+};
 
 onMounted(() => {
   const terminal = new Terminal({
     cursorBlink: true,
     fontSize: 16,
     theme: {
-      background: "#1e1e1e",
-      foreground: "#ffffff",
+      background: "#050505",
+      foreground: "#f5f5f5",
     },
   });
 
-  terminal.open(document.getElementById("terminal") as HTMLElement);
-  programmer.setTerminal(terminal);
+  if (terminalRef.value) {
+    terminal.open(terminalRef.value);
+    programmer.setTerminal(terminal);
+  }
 });
-
-const doFlash = async (variant: string) => {
-  selectedVariant.value = variant;
-  await programmer.flashFirmware(selectedVariant.value);
-};
 </script>
