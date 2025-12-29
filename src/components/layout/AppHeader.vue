@@ -9,66 +9,57 @@
       </RouterLink>
     </template>
 
-    <template #default>
-      <div class="flex items-center gap-4 w-full">
-        <nav class="hidden md:flex flex-1 gap-1">
-          <RouterLink
-            v-for="item in navItems"
-            :key="item.to"
-            :to="item.to"
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-            :class="
-              item.active
-                ? 'bg-pink-500/10 text-pink-400'
-                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
-            "
-          >
-            {{ item.label }}
-          </RouterLink>
-        </nav>
-        <div class="ms-auto flex items-center gap-3">
-          <div v-if="loading" class="hidden sm:flex items-center gap-2">
-            <USkeleton class="h-6 w-24" />
-          </div>
-          <div v-else-if="isAuthenticated" class="flex items-center gap-2">
-            <UBadge color="primary" variant="subtle" class="hidden sm:inline-flex">
-              {{ userName ?? 'Signed in' }}
-            </UBadge>
-            <UTooltip text="Sign out">
-              <UButton
-                icon="lucide:log-out"
-                variant="ghost"
-                color="neutral"
-                size="sm"
-                @click="$emit('logout')"
-              />
-            </UTooltip>
-          </div>
-          <div v-else>
-            <UButton
-              color="primary"
-              variant="soft"
-              icon="lucide:log-in"
-              size="sm"
-              @click="$emit('login')"
-            >
-              Factory Login
-            </UButton>
-          </div>
-        </div>
+    <!-- Desktop nav -->
+    <UNavigationMenu :items="navigationItems" class="hidden md:flex" />
+
+    <template #right>
+      <div v-if="loading" class="hidden sm:flex items-center gap-2">
+        <USkeleton class="h-6 w-24" />
       </div>
+      <div v-else-if="isAuthenticated" class="flex items-center gap-2">
+        <UBadge color="primary" variant="subtle" class="hidden sm:inline-flex">
+          {{ userName ?? 'Signed in' }}
+        </UBadge>
+        <UTooltip text="Sign out">
+          <UButton
+            icon="lucide:log-out"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            @click="$emit('logout')"
+          />
+        </UTooltip>
+      </div>
+      <div v-else>
+        <UButton
+          color="primary"
+          variant="soft"
+          icon="lucide:log-in"
+          size="sm"
+          @click="$emit('login')"
+        >
+          Factory Login
+        </UButton>
+      </div>
+    </template>
+
+    <!-- Mobile nav (in body slot with vertical orientation) -->
+    <template #body>
+      <UNavigationMenu orientation="vertical" :items="navigationItems" />
     </template>
   </UHeader>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface NavItem {
   label: string
   to: string
   active?: boolean
 }
 
-defineProps<{
+const props = defineProps<{
   navItems: NavItem[]
   isAuthenticated: boolean
   loading?: boolean
@@ -76,4 +67,13 @@ defineProps<{
 }>()
 
 defineEmits<{ (e: 'login'): void; (e: 'logout'): void }>()
+
+// Convert navItems to UNavigationMenu format
+const navigationItems = computed(() =>
+  props.navItems.map((item) => ({
+    label: item.label,
+    to: item.to,
+    active: item.active,
+  }))
+)
 </script>
