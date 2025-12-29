@@ -16,21 +16,21 @@
 </template>
 
 <script setup lang="ts">
-import { toRefs } from "vue";
+import { toRefs } from 'vue'
 
 const props = withDefaults(
   defineProps<{
-    label: string;
-    value: string;
-    description?: string;
-    color?: "primary" | "success" | "warning" | "error" | "neutral" | "info";
-    icon?: string;
+    label: string
+    value: string
+    description?: string
+    color?: 'primary' | 'success' | 'warning' | 'error' | 'neutral' | 'info'
+    icon?: string
   }>(),
   {
-    color: "neutral",
-    icon: "lucide:info",
+    color: 'neutral',
+    icon: 'lucide:info',
   }
-);
+)
 
-const { label, value, description, color, icon } = toRefs(props);
+const { label, value, description, color, icon } = toRefs(props)
 </script>

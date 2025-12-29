@@ -1,21 +1,24 @@
 {
-  "name": "factory",
+  "name": "firmware-spa",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint .",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write \"src/**/*.{ts,vue,js,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,js,json,css}\"",
     "typecheck": "vue-tsc --noEmit --skipLibCheck",
-    "api:generate": "pnpm exec openapi-typescript https://firmware.api.koiosdigital.net/swagger.json -o src/types/firmware-api.ts && pnpm exec openapi-typescript https://provisioning.api.koiosdigital.net/swagger.json -o src/types/provisioning-api.ts"
+    "generate:api": "pnpm exec openapi-typescript https://firmware.api.koiosdigital.net/swagger.json -o src/types/firmware-api.ts && pnpm exec openapi-typescript https://licensing.api.koiosdigital.net/swagger.json -o src/types/licensing-api.ts"
   },
   "dependencies": {
     "@iconify/vue": "^4.1.1",
     "@nuxt/ui": "4.3.0",
     "@unhead/vue": "^2.0.19",
     "@xterm/xterm": "^6.0.0",
-    "@zip.js/zip.js": "^2.8.11",
+    "esp-web-tools": "^10.1.1",
     "esptool-js": "^0.5.7",
     "oidc-client-ts": "^3.4.1",
     "openapi-fetch": "^0.15.0",
@@ -25,7 +28,7 @@
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },
-  "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39",
+  "packageManager": "pnpm@11.0.0-dev.1005+sha512.91f84a392eea348ea4852a182912d2520273a4336f933b78cc44bc931eb999923c097e9433a9b355adc1f725725ea99082fc9f032a559df832632e764c92c798",
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@tailwindcss/vite": "^4.1.18",
@@ -33,9 +36,13 @@
     "@types/w3c-web-serial": "^1.0.8",
     "@vitejs/plugin-vue": "^5.1.4",
     "eslint": "^9.39.2",
-    "eslint-plugin-vue": "^9.29.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-vue": "^10.6.2",
+    "globals": "^16.5.0",
     "openapi-typescript": "^7.10.1",
-    "typescript-eslint": "^8.18.2",
+    "prettier": "^3.7.4",
+    "typescript-eslint": "^8.50.1",
     "vite": "^6.0.3",
     "vue-eslint-parser": "^10.2.0",
     "vue-tsc": "^2.1.10"

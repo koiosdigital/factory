@@ -1,58 +1,89 @@
 <template>
-  <UContainer>
-    <UPageHeader title="Select a device to program" />
-    <div class="mb-5" />
-    <div v-if="errorMessage" class="mb-5">
-      <UAlert
-        color="error"
-        title="Unable to load projects"
-        :description="errorMessage"
-      />
+  <UContainer class="py-8">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold mb-2">Koios Firmware</h1>
+      <p class="text-zinc-400">Select your device to install or update firmware</p>
     </div>
-    <UPageGrid v-if="projects.length">
-      <UPageCard
+
+    <div v-if="errorMessage" class="mb-6">
+      <UAlert color="error" title="Unable to load devices" :description="errorMessage" />
+    </div>
+
+    <div v-if="loading" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <USkeleton v-for="i in 3" :key="i" class="h-32" />
+    </div>
+
+    <div v-else-if="projects.length" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <RouterLink
         v-for="project in projects"
         :key="project.slug"
-        :title="project.name"
-        :to="`/program/${project.slug}`"
-      />
-    </UPageGrid>
-    <div v-else-if="loading">
-      <UProgress />
+        :to="`/flash/${project.slug}`"
+        class="group"
+      >
+        <UCard
+          class="h-full transition-all hover:border-pink-500/50 hover:shadow-lg hover:shadow-pink-500/10"
+        >
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="font-semibold text-lg group-hover:text-pink-400 transition-colors">
+                {{ project.name }}
+              </h3>
+              <p class="text-sm text-zinc-500 mt-1">{{ project.slug }}</p>
+            </div>
+            <div class="p-2 rounded-lg bg-pink-500/10 text-pink-400">
+              <UIcon name="lucide:cpu" class="w-5 h-5" />
+            </div>
+          </div>
+          <div class="mt-4 flex items-center text-sm text-zinc-400">
+            <UIcon
+              name="lucide:arrow-right"
+              class="w-4 h-4 mr-1 group-hover:translate-x-1 transition-transform"
+            />
+            Flash firmware
+          </div>
+        </UCard>
+      </RouterLink>
     </div>
-    <UAlert v-else color="warning" title="No projects found" />
+
+    <UCard v-else class="text-center py-12">
+      <UIcon name="lucide:package-x" class="w-12 h-12 mx-auto text-zinc-600 mb-4" />
+      <h3 class="font-medium text-lg mb-2">No devices available</h3>
+      <p class="text-zinc-400">Check back later for available firmware.</p>
+    </UCard>
   </UContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref } from 'vue'
+import { useHead } from '@unhead/vue'
 
-import { useFirmwareApi } from "@/lib/api/firmware";
-import type { components } from "@/types/firmware-api";
+import { useFirmwareApi } from '@/lib/api/firmware'
+import type { components } from '@/types/firmware-api'
 
-type Project = components["schemas"]["Project"];
+useHead({ title: 'Devices' })
 
-const firmware = useFirmwareApi();
+type Project = components['schemas']['Project']
 
-const projects = ref<Project[]>([]);
-const loading = ref(false);
-const errorMessage = ref("");
+const firmware = useFirmwareApi()
+
+const projects = ref<Project[]>([])
+const loading = ref(false)
+const errorMessage = ref('')
 
 const fetchProjects = async () => {
-  loading.value = true;
-  errorMessage.value = "";
+  loading.value = true
+  errorMessage.value = ''
 
   try {
-    const { data, error } = await firmware.GET("/projects");
-    if (error) throw error;
-    projects.value = data ?? [];
+    const { data, error } = await firmware.GET('/projects')
+    if (error) throw error
+    projects.value = data ?? []
   } catch (error) {
-    errorMessage.value =
-      error instanceof Error ? error.message : "Unknown error";
+    errorMessage.value = error instanceof Error ? error.message : 'Unknown error'
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-onMounted(fetchProjects);
+onMounted(fetchProjects)
 </script>

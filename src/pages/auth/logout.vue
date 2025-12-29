@@ -2,10 +2,7 @@
   <UContainer class="py-16">
     <UPageCard variant="subtle" class="max-w-xl mx-auto text-center">
       <template #header>
-        <UPageHeader
-          title="Signing out"
-          description="Ending your secure session."
-        />
+        <UPageHeader title="Signing out" description="Ending your secure session." />
       </template>
 
       <div class="space-y-4">
@@ -20,13 +17,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted } from 'vue'
 
-import { useAuthStore } from "@/stores/auth";
+import { useAuthStore } from '@/stores/auth'
 
-const auth = useAuthStore();
+const auth = useAuthStore()
 
 onMounted(() => {
-  void auth.logout();
-});
+  void auth.logout()
+})
 </script>

@@ -4,389 +4,608 @@
  */
 
 export interface paths {
-    "/swagger.json": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** OpenAPI document */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OpenAPI JSON document */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List firmware projects */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Projects list */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Project"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{slug}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get variants for a project */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    slug: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Project info and variants */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ProjectVariantsResponse"];
-                    };
-                };
-                /** @description Project not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Upstream GitHub error */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/projects/{slug}/{variant}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get manifest for a project variant */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    slug: string;
-                    variant: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Firmware manifest JSON (URLs rewritten to absolute) */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                    };
-                };
-                /** @description Project/variant not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Upstream GitHub error */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * OTA update check (header-driven)
-         * @description Requires x-firmware-project and x-firmware-version headers. If project supports variants, also requires x-firmware-variant.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header: {
-                    "x-firmware-project": string;
-                    "x-firmware-version": string;
-                    "x-firmware-variant"?: string;
-                    "x-device-mac-address"?: string;
-                    "x-device-identity"?: string;
-                };
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OTA decision */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["FirmwareUpdateResponse"];
-                    };
-                };
-                /** @description Missing/invalid headers */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unknown project */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Upstream GitHub error */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/mirror/{encodedURL}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Mirror a GitHub download URL (restricted) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    encodedURL: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Binary response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Invalid URL */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Host not allowed */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/tz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Return client timezone (via IP geolocation) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Timezone response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["TimezoneResponse"];
-                    };
-                };
-                /** @description Missing/invalid IP */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Upstream lookup error */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
+  '/swagger.json': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** OpenAPI document */
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description OpenAPI JSON document */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/projects': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List all firmware projects */
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description Projects list */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['Project'][]
+          }
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/projects/{project}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get project details with variants
+     * @description Returns project info with all variants and their latest versions.
+     */
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          /** @description Project slug (e.g., "matrx-fw") */
+          project: string
+        }
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description Project info with variants */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['ProjectDetailsResponse']
+          }
+        }
+        /** @description Project not found */
+        404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/projects/{project}/{variant}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get variant details with all versions
+     * @description Returns variant info with all available versions sorted by semver.
+     */
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          /** @description Project slug */
+          project: string
+          /** @description Variant name (e.g., "MATRX_MINI") */
+          variant: string
+        }
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description Variant info with versions */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['VariantDetailsResponse']
+          }
+        }
+        /** @description Project or variant not found */
+        404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/projects/{project}/{variant}/{version}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get firmware manifest with absolute URLs
+     * @description Returns the firmware manifest with relative paths transformed to absolute R2 URLs. Response is cached immutably.
+     */
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path: {
+          /** @description Project slug */
+          project: string
+          /** @description Variant name */
+          variant: string
+          /** @description Version string */
+          version: string
+        }
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description Manifest with absolute URLs */
+        200: {
+          headers: {
+            /** @description public, max-age=31536000, immutable */
+            'Cache-Control'?: string
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['FirmwareManifest']
+          }
+        }
+        /** @description Invalid parameters */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Manifest not found */
+        404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * OTA update check (header-driven)
+     * @description Checks if a firmware update is available. Requires x-firmware-project and x-firmware-version headers. Use x-firmware-variant for multi-variant projects.
+     */
+    get: {
+      parameters: {
+        query?: never
+        header: {
+          /** @description Project slug */
+          'x-firmware-project': string
+          /** @description Current firmware version (semver) */
+          'x-firmware-version': string
+          /** @description Firmware variant */
+          'x-firmware-variant'?: string
+        }
+        path?: never
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description OTA decision */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['FirmwareUpdateResponse']
+          }
+        }
+        /** @description Missing/invalid headers */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Unknown project or no releases found */
+        404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/webhook/github': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * GitHub release webhook
+     * @description Receives GitHub release webhook events. Auto-creates projects and syncs firmware assets to R2 storage. Requires X-Hub-Signature-256 header.
+     */
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          'application/json': components['schemas']['GitHubWebhookPayload']
+        }
+      }
+      responses: {
+        /** @description Webhook processed */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['WebhookResponse']
+          }
+        }
+        /** @description Invalid payload */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Invalid or missing signature */
+        401: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/coredump': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Analyze ESP-IDF coredump
+     * @description Parses ESP-IDF coredump data and extracts crash information. Returns raw addresses for local addr2line decoding with the ELF file.
+     */
+    post: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody: {
+        content: {
+          'application/json': components['schemas']['CoredumpRequest']
+        }
+      }
+      responses: {
+        /** @description Coredump analysis result */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['CoredumpResponse']
+          }
+        }
+        /** @description Invalid request body */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Project not found */
+        404: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/tz': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get client timezone via IP geolocation */
+    get: {
+      parameters: {
+        query?: never
+        header?: never
+        path?: never
+        cookie?: never
+      }
+      requestBody?: never
+      responses: {
+        /** @description Timezone response */
+        200: {
+          headers: {
+            [name: string]: unknown
+          }
+          content: {
+            'application/json': components['schemas']['TimezoneResponse']
+          }
+        }
+        /** @description Missing/invalid IP */
+        400: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+        /** @description Upstream lookup error */
+        502: {
+          headers: {
+            [name: string]: unknown
+          }
+          content?: never
+        }
+      }
+    }
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
-export type webhooks = Record<string, never>;
+export type webhooks = Record<string, never>
 export interface components {
-    schemas: {
-        Project: {
-            slug: string;
-            supports_variants: boolean;
-            repository_slug: string;
-            name: string;
-        };
-        ProjectVariantsResponse: {
-            name: string;
-            repo: string;
-            variants: string[];
-        };
-        FirmwareUpdateResponse: {
-            /** @constant */
-            error: false;
-            /** @constant */
-            update_available: false;
-        } | {
-            /** @constant */
-            error: false;
-            /** @constant */
-            update_available: true;
-            ota_url: string;
-        } | {
-            /** @constant */
-            error: true;
-            /** @constant */
-            update_available: false;
-            error_message: string;
-        };
-        TimezoneResponse: {
-            tzname: string;
-        };
-    };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+  schemas: {
+    Project: {
+      id: number
+      /** @description Unique project identifier */
+      slug: string
+      /** @description GitHub repository (e.g., "koiosdigital/matrx-fw") */
+      repository_slug: string
+      /** @description Display name */
+      name: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: date-time */
+      updated_at: string
+    }
+    ProjectDetailsResponse: {
+      slug: string
+      name: string
+      repository: string
+      variants: {
+        /** @description Variant name */
+        name: string
+        /** @description Latest semver version */
+        latest_version: string
+        /** @description Number of releases for this variant */
+        release_count: number
+      }[]
+    }
+    VariantDetailsResponse: {
+      project: string
+      variant: string
+      latest_version: string
+      versions: {
+        version: string
+        /** Format: date-time */
+        created_at: string
+      }[]
+    }
+    FirmwareUpdateResponse:
+      | {
+          /** @constant */
+          error: false
+          /** @constant */
+          update_available: false
+        }
+      | {
+          /** @constant */
+          error: false
+          /** @constant */
+          update_available: true
+          /** Format: uri */
+          ota_url: string
+        }
+      | {
+          /** @constant */
+          error: true
+          /** @constant */
+          update_available: false
+          error_message: string
+        }
+    TimezoneResponse: {
+      /** @description IANA timezone name */
+      tzname: string
+    }
+    GitHubWebhookPayload: {
+      /** @description Event action (e.g., "published") */
+      action?: string
+      release?: {
+        tag_name?: string
+        name?: string
+        assets?: {
+          name?: string
+          browser_download_url?: string
+          content_type?: string
+        }[]
+      }
+      repository?: {
+        full_name?: string
+      }
+    }
+    WebhookResponse: {
+      message?: string
+      project?: string
+      version?: string
+      /** @description Files stored in R2 */
+      stored?: string[]
+      /** @description Any errors encountered */
+      errors?: string[]
+    }
+    CoredumpRequest: {
+      /** @description Project slug (e.g., "matrx-fw") */
+      project: string
+      /** @description Firmware variant (e.g., "MATRX_MINI") */
+      variant: string
+      /** @description Firmware version (e.g., "1.2.3") */
+      version: string
+      /** @description Base64-encoded coredump data */
+      coredump: string
+    }
+    CoredumpResponse: {
+      success?: boolean
+      crash_info?: {
+        exception_cause?: string
+        /** @description Program counter (hex) */
+        pc?: string
+        registers?: {
+          [key: string]: string
+        }
+      }
+      /** @description Backtrace addresses (hex) */
+      backtrace?: string[]
+      /**
+       * Format: uri
+       * @description URL to download ELF for addr2line
+       */
+      elf_download_url?: string
+      error?: string
+    }
+    /** @description ESP Web Tools compatible manifest with absolute URLs */
+    FirmwareManifest: {
+      /** @description Firmware name */
+      name?: string
+      /** @description Firmware version */
+      version?: string
+      builds?: {
+        /** @description Target chip (e.g., "ESP32") */
+        chipFamily?: string
+        parts?: {
+          /**
+           * Format: uri
+           * @description Absolute URL to binary file
+           */
+          path?: string
+          /** @description Flash offset in bytes */
+          offset?: number
+        }[]
+      }[]
+    }
+  }
+  responses: never
+  parameters: never
+  requestBodies: never
+  headers: never
+  pathItems: never
 }
-export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export type $defs = Record<string, never>
+export type operations = Record<string, never>
