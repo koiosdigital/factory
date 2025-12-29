@@ -1,18 +1,19 @@
-import { defineStore } from 'pinia'
+import { defineStore, storeToRefs } from 'pinia'
 import { Transport } from 'esptool-js'
 import { ref, shallowRef } from 'vue'
 import { useToast } from '@nuxt/ui/composables'
 import type { Terminal } from '@xterm/xterm'
 
 import { useLicensingApi } from '@/lib/api/licensing'
-import { writeSimple } from '@/lib/serial/chunkedWrite'
+import { writeChunked } from '@/lib/serial/chunkedWrite'
 import { useAuthStore } from '@/stores/auth'
 import { CryptoState } from '@/types/programmer'
 
 const ESPRESSIF_VENDOR_ID = 0x303a
 
 export const useConsoleStore = defineStore('console', () => {
-  const auth = useAuthStore()
+  const authStore = useAuthStore()
+  const { isAuthenticated } = storeToRefs(authStore)
   const licensingApi = useLicensingApi()
   const toast = useToast()
 
@@ -30,7 +31,9 @@ export const useConsoleStore = defineStore('console', () => {
   // Internal state
   let terminal: Terminal | null = null
   let consoleAbortController: AbortController | null = null
-  let pendingCsr: string | null = null
+
+  // Callback for CSR response
+  let csrResolve: ((csr: string) => void) | null = null
 
   const setTerminal = (term: Terminal) => {
     terminal = term
@@ -53,12 +56,12 @@ export const useConsoleStore = defineStore('console', () => {
       deviceSupportsCrypto.value = false
       cryptoStatus.value = null
       needsProvisioning.value = false
-      pendingCsr = null
+      csrResolve = null
 
       startConsoleLoop()
 
       // If authenticated, check crypto status after a short delay
-      if (auth.isAuthenticated) {
+      if (isAuthenticated.value) {
         setTimeout(() => checkCryptoStatus(), 1000)
       }
     } catch (e) {
@@ -88,7 +91,7 @@ export const useConsoleStore = defineStore('console', () => {
     deviceSupportsCrypto.value = false
     cryptoStatus.value = null
     needsProvisioning.value = false
-    pendingCsr = null
+    csrResolve = null
   }
 
   const resetChip = async () => {
@@ -101,7 +104,7 @@ export const useConsoleStore = defineStore('console', () => {
 
   const writeCommand = async (cmd: string) => {
     if (!transport.value) return
-    await writeSimple(transport.value, cmd)
+    await writeChunked(transport.value, cmd)
   }
 
   const startConsoleLoop = async () => {
@@ -126,7 +129,7 @@ export const useConsoleStore = defineStore('console', () => {
         buffer = lines.pop() ?? ''
 
         for (const line of lines) {
-          if (auth.isAuthenticated) {
+          if (isAuthenticated.value) {
             handleConsoleLine(line.trim())
           }
         }
@@ -149,16 +152,17 @@ export const useConsoleStore = defineStore('console', () => {
           // Check if device needs provisioning
           if (json.status === CryptoState.VALID_CSR) {
             needsProvisioning.value = true
-            // Request CSR
-            void writeCommand('get_csr\n')
           } else if (json.status === CryptoState.VALID_CERT) {
             needsProvisioning.value = false
           }
         }
 
-        // Handle CSR response
+        // Handle CSR response - resolve pending promise if waiting
         if ('csr' in json && typeof json.csr === 'string') {
-          pendingCsr = json.csr
+          if (csrResolve) {
+            csrResolve(json.csr)
+            csrResolve = null
+          }
         }
       }
     } catch {
@@ -167,23 +171,34 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   const checkCryptoStatus = async () => {
-    if (!auth.isAuthenticated) return
+    if (!isAuthenticated.value) return
     if (!connected.value) return
     await writeCommand('crypto_status\n')
   }
 
-  const provisionDevice = async () => {
-    if (!auth.isAuthenticated) return
-    if (!pendingCsr) {
-      toast.add({
-        title: 'No CSR available',
-        description: 'Device has not provided a certificate signing request',
-        color: 'error',
-      })
-      return
-    }
+  const requestCsr = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Set up timeout
+      const timeout = setTimeout(() => {
+        csrResolve = null
+        reject(new Error('Timeout waiting for CSR from device'))
+      }, 10000)
 
-    const accessToken = auth.getAccessToken()
+      // Set up callback
+      csrResolve = (csr: string) => {
+        clearTimeout(timeout)
+        resolve(csr)
+      }
+
+      // Send command to device
+      writeCommand('get_csr\n')
+    })
+  }
+
+  const provisionDevice = async () => {
+    if (!isAuthenticated.value) return
+
+    const accessToken = authStore.getAccessToken()
     if (!accessToken) {
       toast.add({
         title: 'Not authenticated',
@@ -196,8 +211,11 @@ export const useConsoleStore = defineStore('console', () => {
     provisioning.value = true
 
     try {
-      // Decode base64 CSR to PEM text
-      const csrText = atob(pendingCsr)
+      // Step 1: Request CSR from device
+      const csrBase64 = await requestCsr()
+
+      // Step 2: Decode base64 CSR to PEM text and send to licensing API
+      const csrText = atob(csrBase64)
       const formData = new FormData()
       formData.append('csr', csrText)
 
@@ -213,7 +231,7 @@ export const useConsoleStore = defineStore('console', () => {
         throw new Error('Failed to sign CSR')
       }
 
-      // Encode certificate as base64 and send to device
+      // Step 3: Encode certificate as base64 and send to device
       const certBase64 = btoa(data ?? '')
       await writeCommand(`set_device_cert ${certBase64}\n`)
 
@@ -224,7 +242,6 @@ export const useConsoleStore = defineStore('console', () => {
       })
 
       needsProvisioning.value = false
-      pendingCsr = null
 
       // Check status again after a delay
       setTimeout(() => checkCryptoStatus(), 2000)

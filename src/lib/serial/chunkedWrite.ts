@@ -7,8 +7,8 @@ import type { Transport } from 'esptool-js'
 export const writeChunked = async (
   transport: Transport,
   data: string,
-  chunkSize = 64,
-  delayMs = 50
+  chunkSize = 128,
+  delayMs = 25
 ): Promise<void> => {
   for (let i = 0; i < data.length; i += chunkSize) {
     const chunk = data.slice(i, i + chunkSize)
