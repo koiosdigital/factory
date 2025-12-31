@@ -5,7 +5,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-xl font-semibold">Device Console</h1>
-            <p class="text-sm text-zinc-400">Monitor your device's serial output</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Monitor your device's serial output</p>
           </div>
           <UBadge :color="consoleStore.connected ? 'success' : 'neutral'" size="lg">
             {{ consoleStore.connected ? 'Connected' : 'Disconnected' }}
@@ -46,7 +46,7 @@
       <!-- Terminal -->
       <div
         ref="terminalRef"
-        class="terminal-container h-96 rounded-lg border border-zinc-800 bg-black overflow-hidden"
+        class="terminal-container h-96 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-black overflow-hidden"
       />
 
       <p class="mt-3 text-xs text-zinc-500">
@@ -65,7 +65,7 @@
             <UIcon name="lucide:shield-check" class="w-6 h-6 text-pink-500" />
           </div>
           <div>
-            <p class="text-sm text-zinc-400">Crypto Engine</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Crypto Engine</p>
             <p class="font-medium">{{ consoleStore.getCryptoStatusText() }}</p>
           </div>
         </div>
@@ -75,7 +75,7 @@
         <div class="flex items-center justify-between h-full">
           <div>
             <p class="font-medium">Provisioning Required</p>
-            <p class="text-sm text-zinc-400">This device needs a certificate</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">This device needs a certificate</p>
           </div>
           <UButton color="primary" icon="lucide:key" @click="showProvisionModal = true">
             Provision
@@ -97,8 +97,8 @@
             </div>
           </template>
 
-          <p class="text-zinc-300">Device needs provisioning. Provision now?</p>
-          <p class="text-sm text-zinc-400 mt-2">
+          <p class="text-zinc-700 dark:text-zinc-300">Device needs provisioning. Provision now?</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
             This will sign the device's certificate request and install the certificate.
           </p>
 

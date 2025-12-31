@@ -6,13 +6,7 @@ import ui from '@nuxt/ui/vite'
 
 export default defineConfig({
     plugins: [
-        vue({
-            template: {
-                compilerOptions: {
-                    isCustomElement: (tag) => tag === 'esp-web-install-button'
-                }
-            }
-        }),
+        vue(),
         tailwindcss(),
         ui({
             ui: {

@@ -1,11 +1,12 @@
 <template>
   <UHeader
-    class="sticky top-0 z-40 border-b border-zinc-800 backdrop-blur-lg bg-zinc-950/80"
+    class="sticky top-0 z-40 border-b border-zinc-200 dark:border-zinc-800 backdrop-blur-lg bg-white/80 dark:bg-zinc-950/80"
     :ui="{ wrapper: 'max-w-6xl mx-auto px-4 py-3' }"
   >
     <template #title>
       <RouterLink to="/" class="flex items-center gap-3">
-        <img src="@/assets/img/type_dark.png" alt="Koios" class="h-6 sm:h-7" />
+        <img src="@/assets/img/logo_light.png" alt="Koios" class="h-6 sm:h-7 dark:hidden" />
+        <img src="@/assets/img/logo_dark.png" alt="Koios" class="h-6 sm:h-7 hidden dark:block" />
       </RouterLink>
     </template>
 

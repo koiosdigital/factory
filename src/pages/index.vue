@@ -2,7 +2,7 @@
   <UContainer class="py-8">
     <div class="text-center mb-8">
       <h1 class="text-3xl font-bold mb-2">Koios Firmware</h1>
-      <p class="text-zinc-400">Select your device to install or update firmware</p>
+      <p class="text-zinc-600 dark:text-zinc-400">Select your device to install or update firmware</p>
     </div>
 
     <div v-if="errorMessage" class="mb-6">
@@ -34,7 +34,7 @@
               <UIcon name="lucide:cpu" class="w-5 h-5" />
             </div>
           </div>
-          <div class="mt-4 flex items-center text-sm text-zinc-400">
+          <div class="mt-4 flex items-center text-sm text-zinc-600 dark:text-zinc-400">
             <UIcon
               name="lucide:arrow-right"
               class="w-4 h-4 mr-1 group-hover:translate-x-1 transition-transform"
@@ -46,9 +46,9 @@
     </div>
 
     <UCard v-else class="text-center py-12">
-      <UIcon name="lucide:package-x" class="w-12 h-12 mx-auto text-zinc-600 mb-4" />
+      <UIcon name="lucide:package-x" class="w-12 h-12 mx-auto text-zinc-400 dark:text-zinc-600 mb-4" />
       <h3 class="font-medium text-lg mb-2">No devices available</h3>
-      <p class="text-zinc-400">Check back later for available firmware.</p>
+      <p class="text-zinc-600 dark:text-zinc-400">Check back later for available firmware.</p>
     </UCard>
   </UContainer>
 </template>

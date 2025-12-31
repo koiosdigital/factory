@@ -4,13 +4,13 @@
       <div class="space-y-2">
         <RouterLink
           to="/"
-          class="text-sm text-zinc-400 hover:text-pink-400 flex items-center gap-1"
+          class="text-sm text-zinc-600 dark:text-zinc-400 hover:text-pink-400 flex items-center gap-1"
         >
           <UIcon name="lucide:arrow-left" class="w-4 h-4" />
           Back to devices
         </RouterLink>
         <h1 class="text-2xl font-semibold">{{ project?.name ?? projectSlug }}</h1>
-        <p class="text-zinc-400">Select your device variant and firmware version to flash.</p>
+        <p class="text-zinc-600 dark:text-zinc-400">Select your device variant and firmware version to flash.</p>
       </div>
     </UCard>
 
@@ -58,41 +58,89 @@
             placeholder="Select a version"
             class="max-w-xs"
           />
-          <p v-if="selectedVersion" class="text-sm text-zinc-400">
+          <p v-if="selectedVersion" class="text-sm text-zinc-600 dark:text-zinc-400">
             Selected: {{ selectedVariant }} v{{ selectedVersion }}
           </p>
         </div>
         <UAlert v-else color="warning" title="No versions available" />
       </UCard>
 
-      <!-- Flash Button -->
-      <UCard v-if="selectedVersion && manifestUrl">
-        <div class="space-y-4">
-          <div class="flex items-center gap-4">
-            <esp-web-install-button ref="flashButton" :manifest="manifestUrl" class="esp-button">
-              <UButton slot="activate" color="primary" size="lg" icon="lucide:zap">
-                Install Firmware
-              </UButton>
-              <span slot="unsupported">
-                <UAlert
-                  color="error"
-                  title="Browser not supported"
-                  description="Please use Chrome or Edge on desktop."
-                />
-              </span>
-              <span slot="not-allowed">
-                <UAlert
-                  color="warning"
-                  title="HTTPS required"
-                  description="Firmware installation requires a secure connection."
-                />
-              </span>
-            </esp-web-install-button>
+      <!-- Flash Controls -->
+      <UCard v-if="selectedVersion">
+        <div class="space-y-6">
+          <!-- Browser Not Supported -->
+          <UAlert
+            v-if="!isSerialSupported"
+            color="error"
+            icon="lucide:alert-triangle"
+            title="Browser Not Supported"
+            description="Web Serial API requires Chrome or Edge version 89 or later."
+          />
+
+          <!-- Idle State: Select Device Button -->
+          <div v-else-if="flashStore.state === 'idle'" class="space-y-4">
+            <UButton
+              color="primary"
+              size="lg"
+              icon="lucide:usb"
+              :loading="false"
+              @click="handleFlash"
+            >
+              Select Device & Install
+            </UButton>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+              Click to select your ESP32 device and begin installation.
+            </p>
           </div>
-          <p class="text-sm text-zinc-400">
-            Click to connect your device and install the firmware. After installation, you'll be
-            redirected to the console.
-          </p>
+
+          <!-- Downloading Progress -->
+          <div v-else-if="flashStore.state === 'downloading'" class="space-y-3">
+            <div class="flex items-center gap-3">
+              <UIcon name="lucide:download" class="w-5 h-5 text-pink-500 animate-pulse" />
+              <span class="font-medium">Downloading firmware...</span>
+            </div>
+            <UProgress :value="flashStore.downloadProgress" color="primary" />
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+              File {{ flashStore.currentFileIndex + 1 }} of {{ flashStore.totalFiles }} -
+              {{ flashStore.downloadProgress }}%
+            </p>
+          </div>
+
+          <!-- Flashing Progress -->
+          <div v-else-if="flashStore.state === 'flashing'" class="space-y-3">
+            <div class="flex items-center gap-3">
+              <UIcon name="lucide:zap" class="w-5 h-5 text-pink-500 animate-pulse" />
+              <span class="font-medium">Flashing firmware...</span>
+            </div>
+            <UProgress :value="flashStore.flashProgress" color="primary" />
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+              File {{ flashStore.currentFileIndex + 1 }} of {{ flashStore.totalFiles }} -
+              {{ flashStore.flashProgress }}%
+            </p>
+          </div>
+
+          <!-- Complete State -->
+          <div v-else-if="flashStore.state === 'complete'" class="space-y-3">
+            <UAlert
+              color="success"
+              icon="lucide:check-circle"
+              title="Installation Complete"
+              description="Firmware has been installed."
+            />
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="flashStore.state === 'error'" class="space-y-4">
+            <UAlert
+              color="error"
+              icon="lucide:alert-circle"
+              title="Installation Failed"
+              :description="flashStore.errorMessage ?? 'An unknown error occurred'"
+            />
+            <UButton color="neutral" variant="outline" @click="flashStore.reset()">
+              Try Again
+            </UButton>
+          </div>
         </div>
       </UCard>
     </template>
@@ -100,13 +148,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import 'esp-web-tools'
 
 import { useFirmwareApi } from '@/lib/api/firmware'
-import { getRuntimeConfig } from '@/lib/runtime/config'
+import { isSerialSupported as checkSerialSupport } from '@/lib/serial/ports'
+import { useFlashStore } from '@/stores/flash'
 import type { components } from '@/types/firmware-api'
 
 type ProjectDetailsResponse = components['schemas']['ProjectDetailsResponse']
@@ -115,7 +163,7 @@ type VariantDetailsResponse = components['schemas']['VariantDetailsResponse']
 const route = useRoute()
 const router = useRouter()
 const firmware = useFirmwareApi()
-const config = getRuntimeConfig()
+const flashStore = useFlashStore()
 
 const projectSlug = computed(() => route.params.project as string)
 
@@ -128,7 +176,7 @@ const versions = ref<VariantDetailsResponse['versions']>([])
 const loadingVersions = ref(false)
 const selectedVersion = ref<string | null>(null)
 
-const flashButton = ref<HTMLElement | null>(null)
+const isSerialSupported = checkSerialSupport()
 
 useHead({
   title: computed(() => project.value?.name ?? 'Flash Device'),
@@ -140,11 +188,6 @@ const versionOptions = computed(() =>
     value: v.version,
   }))
 )
-
-const manifestUrl = computed(() => {
-  if (!selectedVariant.value || !selectedVersion.value) return null
-  return `${config.firmwareApiBase}/projects/${projectSlug.value}/${selectedVariant.value}/${selectedVersion.value}`
-})
 
 const fetchProject = async () => {
   if (!projectSlug.value) return
@@ -200,37 +243,28 @@ const selectVariant = async (variantName: string) => {
   }
 }
 
-const handleStateChange = (event: CustomEvent) => {
-  const state = event.detail?.state
-  if (state === 'finished') {
-    // Wait a moment for device to reboot, then redirect to console
-    setTimeout(() => {
-      router.push('/console')
-    }, 2000)
+const handleFlash = async () => {
+  if (!selectedVariant.value || !selectedVersion.value) return
+
+  const success = await flashStore.startFlash(
+    projectSlug.value,
+    selectedVariant.value,
+    selectedVersion.value
+  )
+
+  if (success) {
+    router.push('/console')
   }
 }
 
 onMounted(() => {
   fetchProject()
-})
-
-// Watch for flash button to add event listener
-watch(flashButton, (button) => {
-  if (button) {
-    button.addEventListener('state-changed', handleStateChange as EventListener)
-  }
+  // Reset flash store state when entering the page
+  flashStore.reset()
 })
 
 onUnmounted(() => {
-  if (flashButton.value) {
-    flashButton.value.removeEventListener('state-changed', handleStateChange as EventListener)
-  }
+  // Clean up flash store if navigating away
+  flashStore.disconnect()
 })
 </script>
-
-<style scoped>
-.esp-button {
-  --esp-tools-button-color: #ec4899;
-  --esp-tools-button-text-color: white;
-}
-</style>
