@@ -10,7 +10,9 @@
           Back to devices
         </RouterLink>
         <h1 class="text-2xl font-semibold">{{ project?.name ?? projectSlug }}</h1>
-        <p class="text-zinc-600 dark:text-zinc-400">Select your device variant and firmware version to flash.</p>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          Select your device variant and firmware version to flash.
+        </p>
       </div>
     </UCard>
 

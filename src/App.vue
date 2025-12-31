@@ -30,7 +30,8 @@ import AppHeader from '@/components/layout/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 
 useHead({
-  titleTemplate: (title?: string) => (title ? `${title} | Koios Firmware` : 'Koios Firmware'),
+  titleTemplate: (title?: string) =>
+    title ? `${title} | Koios Digital Firmware` : 'Koios Digital Firmware',
 })
 
 const route = useRoute()

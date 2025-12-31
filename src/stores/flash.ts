@@ -84,9 +84,7 @@ export const useFlashStore = defineStore('flash', () => {
     const normalizedChip = normalizeChipFamily(detectedChip)
 
     // Find matching build for chip
-    const build = manifest.value.builds.find(
-      (b) => b.chipFamily?.toUpperCase() === normalizedChip
-    )
+    const build = manifest.value.builds.find((b) => b.chipFamily?.toUpperCase() === normalizedChip)
 
     if (!build?.parts?.length) {
       throw new Error(`No build found for ${normalizedChip}`)

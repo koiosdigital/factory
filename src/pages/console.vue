@@ -5,7 +5,9 @@
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-xl font-semibold">Device Console</h1>
-            <p class="text-sm text-zinc-600 dark:text-zinc-400">Monitor your device's serial output</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+              Monitor your device's serial output
+            </p>
           </div>
           <UBadge :color="consoleStore.connected ? 'success' : 'neutral'" size="lg">
             {{ consoleStore.connected ? 'Connected' : 'Disconnected' }}
