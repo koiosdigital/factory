@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { ESPLoader, Transport } from 'esptool-js'
 import SparkMD5 from 'spark-md5'
 import { useToast } from '@nuxt/ui/composables'
 
 import { useFirmwareApi } from '@/lib/api/firmware'
 import { buildVendorFilters, isSerialSupported } from '@/lib/serial/ports'
-import { createEspTerminal, silentTerminal } from '@/lib/esptool/terminal'
+import { silentTerminal } from '@/lib/esptool/terminal'
 import { arrayBufferToBinaryString } from '@/lib/esptool/utils'
 import type { FlashState, FileToFlash } from '@/types/flash'
 import type { components } from '@/types/firmware-api'
@@ -42,13 +42,14 @@ export const useFlashStore = defineStore('flash', () => {
   const flashProgress = ref(0)
   const currentFileIndex = ref(0)
   const totalFiles = ref(0)
+  const fileNames = ref<string[]>([])
 
   // Data
   const manifest = ref<FirmwareManifest | null>(null)
   const filesToFlash = ref<FileToFlash[]>([])
 
-  // Terminal (debug in dev, silent in prod)
-  const terminal = import.meta.env.DEV ? createEspTerminal({ debug: true }) : silentTerminal
+  // Silent terminal (no debug output)
+  const terminal = silentTerminal
 
   const reset = () => {
     state.value = 'idle'
@@ -57,6 +58,7 @@ export const useFlashStore = defineStore('flash', () => {
     flashProgress.value = 0
     currentFileIndex.value = 0
     totalFiles.value = 0
+    fileNames.value = []
     manifest.value = null
     filesToFlash.value = []
     detectedChip.value = null
@@ -90,22 +92,37 @@ export const useFlashStore = defineStore('flash', () => {
       throw new Error(`No build found for ${normalizedChip}`)
     }
 
+    const parts = build.parts.filter((p) => p.path && p.offset !== undefined)
+    totalFiles.value = parts.length
+
+    // Extract file names from paths
+    fileNames.value = parts.map((p) => {
+      const url = new URL(p.path!, window.location.origin)
+      return url.pathname.split('/').pop() ?? p.path!
+    })
+
+    // Validate all files exist on the OTA server before downloading
+    const headRequests = parts.map(async (part) => {
+      const response = await fetch(part.path!, { method: 'HEAD' })
+      if (!response.ok) {
+        throw new Error(`File not found: ${fileNames.value[parts.indexOf(part)]}`)
+      }
+    })
+    await Promise.all(headRequests)
+
+    // All files validated, start downloading
     state.value = 'downloading'
     downloadProgress.value = 0
 
-    const parts = build.parts
-    totalFiles.value = parts.length
     const files: FileToFlash[] = []
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i]
-      if (!part.path || part.offset === undefined) continue
-
       currentFileIndex.value = i
 
-      const response = await fetch(part.path)
+      const response = await fetch(part.path!)
       if (!response.ok) {
-        throw new Error(`Failed to download ${part.path}`)
+        throw new Error(`Failed to download ${fileNames.value[i]}`)
       }
 
       const buffer = await response.arrayBuffer()
@@ -113,7 +130,7 @@ export const useFlashStore = defineStore('flash', () => {
 
       files.push({
         data: binaryString,
-        address: part.offset,
+        address: part.offset!,
       })
 
       downloadProgress.value = Math.round(((i + 1) / parts.length) * 100)
@@ -140,13 +157,14 @@ export const useFlashStore = defineStore('flash', () => {
       throw new Error('No port selected')
     }
 
-    transport.value = new Transport(port.value, true)
+    transport.value = new Transport(port.value, false)
 
     esploader.value = new ESPLoader({
       transport: transport.value,
       baudrate: 115200,
       romBaudrate: 115200,
       terminal,
+      enableTracing: false,
     })
 
     // Sync with chip and get chip type
@@ -178,14 +196,22 @@ export const useFlashStore = defineStore('flash', () => {
       calculateMD5Hash: (image) => SparkMD5.hashBinary(image),
     })
 
-    // Reset device after flashing
-    await esploader.value.after()
+    // Hard reset device after flashing to reboot into new firmware
+    await esploader.value.after('hard_reset')
+
+    // Small delay to ensure reset completes before disconnect
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     state.value = 'complete'
   }
 
   const disconnect = async () => {
     try {
+      // Release DTR/RTS before disconnect to ensure chip stays out of bootloader
+      if (transport.value) {
+        await transport.value.setDTR(false)
+        await transport.value.setRTS(false)
+      }
       await transport.value?.disconnect()
     } catch {
       // Ignore disconnect errors
@@ -240,6 +266,8 @@ export const useFlashStore = defineStore('flash', () => {
     }
   }
 
+  const currentFileName = computed(() => fileNames.value[currentFileIndex.value] ?? '')
+
   return {
     // State
     state,
@@ -251,6 +279,7 @@ export const useFlashStore = defineStore('flash', () => {
     flashProgress,
     currentFileIndex,
     totalFiles,
+    currentFileName,
 
     // Data
     manifest,

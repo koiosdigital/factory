@@ -103,8 +103,7 @@
             </div>
             <UProgress :value="flashStore.downloadProgress" color="primary" />
             <p class="text-sm text-zinc-600 dark:text-zinc-400">
-              File {{ flashStore.currentFileIndex + 1 }} of {{ flashStore.totalFiles }} -
-              {{ flashStore.downloadProgress }}%
+              {{ flashStore.currentFileName }} - {{ flashStore.downloadProgress }}%
             </p>
           </div>
 
@@ -116,8 +115,7 @@
             </div>
             <UProgress :value="flashStore.flashProgress" color="primary" />
             <p class="text-sm text-zinc-600 dark:text-zinc-400">
-              File {{ flashStore.currentFileIndex + 1 }} of {{ flashStore.totalFiles }} -
-              {{ flashStore.flashProgress }}%
+              {{ flashStore.currentFileName }} - {{ flashStore.flashProgress }}%
             </p>
           </div>
 
