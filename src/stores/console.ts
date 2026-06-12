@@ -34,6 +34,8 @@ export const useConsoleStore = defineStore('console', () => {
 
   // Callback for CSR response
   let csrResolve: ((csr: string) => void) | null = null
+  // Accumulator for the multi-line PEM CSR emitted by the device
+  let csrBuffer: string[] | null = null
 
   const setTerminal = (term: Terminal) => {
     terminal = term
@@ -140,6 +142,25 @@ export const useConsoleStore = defineStore('console', () => {
   }
 
   const handleConsoleLine = (line: string) => {
+    // The device emits the CSR as raw multi-line PEM (not JSON), so capture the
+    // block between the BEGIN/END markers and resolve once it's complete.
+    if (line === '-----BEGIN CERTIFICATE REQUEST-----') {
+      csrBuffer = [line]
+      return
+    }
+    if (csrBuffer) {
+      csrBuffer.push(line)
+      if (line === '-----END CERTIFICATE REQUEST-----') {
+        const pem = csrBuffer.join('\n')
+        csrBuffer = null
+        if (csrResolve) {
+          csrResolve(pem)
+          csrResolve = null
+        }
+      }
+      return
+    }
+
     // Try to parse JSON responses from device
     try {
       const json = JSON.parse(line)
@@ -154,14 +175,6 @@ export const useConsoleStore = defineStore('console', () => {
             needsProvisioning.value = true
           } else if (json.status === CryptoState.VALID_CERT) {
             needsProvisioning.value = false
-          }
-        }
-
-        // Handle CSR response - resolve pending promise if waiting
-        if ('csr' in json && typeof json.csr === 'string') {
-          if (csrResolve) {
-            csrResolve(json.csr)
-            csrResolve = null
           }
         }
       }
@@ -181,6 +194,7 @@ export const useConsoleStore = defineStore('console', () => {
       // Set up timeout
       const timeout = setTimeout(() => {
         csrResolve = null
+        csrBuffer = null
         reject(new Error('Timeout waiting for CSR from device'))
       }, 10000)
 
@@ -211,11 +225,10 @@ export const useConsoleStore = defineStore('console', () => {
     provisioning.value = true
 
     try {
-      // Step 1: Request CSR from device
-      const csrBase64 = await requestCsr()
+      // Step 1: Request CSR from device (raw PEM text)
+      const csrText = await requestCsr()
 
-      // Step 2: Decode base64 CSR to PEM text and send to licensing API
-      const csrText = atob(csrBase64)
+      // Step 2: Send the PEM CSR to the licensing API for signing
       const formData = new FormData()
       formData.append('csr', csrText)
 
