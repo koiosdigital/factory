@@ -36,6 +36,8 @@ export const useConsoleStore = defineStore('console', () => {
   let csrResolve: ((csr: string) => void) | null = null
   // Accumulator for the multi-line PEM CSR emitted by the device
   let csrBuffer: string[] | null = null
+  // Callback for a pending [OK]/[ERROR] command acknowledgement
+  let responseHandler: ((line: string) => void) | null = null
 
   const setTerminal = (term: Terminal) => {
     terminal = term
@@ -59,6 +61,8 @@ export const useConsoleStore = defineStore('console', () => {
       cryptoStatus.value = null
       needsProvisioning.value = false
       csrResolve = null
+      csrBuffer = null
+      responseHandler = null
 
       startConsoleLoop()
 
@@ -94,6 +98,8 @@ export const useConsoleStore = defineStore('console', () => {
     cryptoStatus.value = null
     needsProvisioning.value = false
     csrResolve = null
+    csrBuffer = null
+    responseHandler = null
   }
 
   const resetChip = async () => {
@@ -161,6 +167,12 @@ export const useConsoleStore = defineStore('console', () => {
       return
     }
 
+    // Dispatch [OK]/[ERROR] acknowledgements to a pending command waiter
+    if (responseHandler && (line.startsWith('[OK]') || line.startsWith('[ERROR]'))) {
+      responseHandler(line)
+      return
+    }
+
     // Try to parse JSON responses from device
     try {
       const json = JSON.parse(line)
@@ -209,6 +221,28 @@ export const useConsoleStore = defineStore('console', () => {
     })
   }
 
+  // Send a command and wait for its [OK] (resolve) / [ERROR] (reject) ack.
+  const sendCommandAwaitOk = (cmd: string, timeoutMs = 5000): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        responseHandler = null
+        reject(new Error(`Timeout waiting for response to: ${cmd.trim()}`))
+      }, timeoutMs)
+
+      responseHandler = (line: string) => {
+        clearTimeout(timeout)
+        responseHandler = null
+        if (line.startsWith('[OK]')) {
+          resolve()
+        } else {
+          reject(new Error(line))
+        }
+      }
+
+      writeCommand(cmd)
+    })
+  }
+
   const provisionDevice = async () => {
     if (!isAuthenticated.value) return
 
@@ -244,9 +278,20 @@ export const useConsoleStore = defineStore('console', () => {
         throw new Error('Failed to sign CSR')
       }
 
-      // Step 3: Encode certificate as base64 and send to device
+      // Step 3: Encode certificate as base64 and upload to device in chunks.
+      // The device concatenates all chunks and decodes them on commit, so the
+      // base64 just needs to be split into pieces small enough for the console.
       const certBase64 = btoa(data ?? '')
-      await writeCommand(`set_device_cert ${certBase64}\n`)
+      const CHUNK_SIZE = 512
+
+      await sendCommandAwaitOk('set_cert_start\n')
+      let chunkIndex = 0
+      for (let i = 0; i < certBase64.length; i += CHUNK_SIZE) {
+        const chunk = certBase64.slice(i, i + CHUNK_SIZE)
+        await sendCommandAwaitOk(`set_cert_chunk ${chunkIndex} ${chunk}\n`)
+        chunkIndex++
+      }
+      await sendCommandAwaitOk('set_cert_commit\n')
 
       toast.add({
         title: 'Success',
