@@ -3,7 +3,6 @@ const defaultOrigin =
 
 export interface RuntimeConfig {
   firmwareApiBase: string
-  licensingApiBase: string
   oidc: {
     issuer: string
     clientId: string
@@ -17,8 +16,6 @@ export interface RuntimeConfig {
 const runtimeConfig: RuntimeConfig = {
   firmwareApiBase:
     import.meta.env.VITE_FIRMWARE_API_BASE ?? 'https://firmware.api.koiosdigital.net',
-  licensingApiBase:
-    import.meta.env.VITE_LICENSING_API_BASE ?? 'https://licensing.api.koiosdigital.net',
   oidc: {
     issuer: import.meta.env.VITE_OIDC_ISSUER ?? 'https://sso.koiosdigital.net/realms/kd-prod',
     clientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? 'firmware-spa',

@@ -22,7 +22,6 @@ The dev server runs on `http://localhost:5173` by default.
 | Variable                        | Description                                            |
 | ------------------------------- | ------------------------------------------------------ |
 | `VITE_FIRMWARE_API_BASE`        | Base URL for the firmware API                          |
-| `VITE_LICENSING_API_BASE`       | Base URL for the licensing API                         |
 | `VITE_OIDC_ISSUER`              | OIDC issuer URL                                        |
 | `VITE_OIDC_CLIENT_ID`           | Public client identifier                               |
 | `VITE_OIDC_REDIRECT_URI`        | Redirect URI registered with the IdP                   |

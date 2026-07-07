@@ -79,7 +79,7 @@
             <p class="font-medium">Provisioning Required</p>
             <p class="text-sm text-zinc-600 dark:text-zinc-400">This device needs a certificate</p>
           </div>
-          <UButton color="primary" icon="lucide:key" @click="showProvisionModal = true">
+          <UButton color="primary" icon="lucide:key" @click="openProvisionModal">
             Provision
           </UButton>
         </div>
@@ -99,20 +99,74 @@
             </div>
           </template>
 
-          <p class="text-zinc-700 dark:text-zinc-300">Device needs provisioning. Provision now?</p>
-          <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-            This will sign the device's certificate request and install the certificate.
-          </p>
+          <!-- Step 1: show the device's CSR for external signing -->
+          <template v-if="provisionStep === 'csr'">
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+              Copy this certificate signing request and sign it with your CA, then continue to
+              install the signed certificate.
+            </p>
+
+            <div
+              v-if="consoleStore.fetchingCsr"
+              class="mt-4 flex items-center gap-2 text-sm text-zinc-500"
+            >
+              <UIcon name="lucide:loader-circle" class="w-4 h-4 animate-spin" />
+              Reading CSR from device…
+            </div>
+            <template v-else-if="consoleStore.csrPem">
+              <pre
+                class="mt-4 p-3 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto select-all"
+                >{{ consoleStore.csrPem }}</pre
+              >
+              <UButton
+                class="mt-3"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                :icon="csrCopied ? 'lucide:check' : 'lucide:copy'"
+                @click="copyCsr"
+              >
+                {{ csrCopied ? 'Copied' : 'Copy CSR' }}
+              </UButton>
+            </template>
+            <p v-else class="mt-4 text-sm text-red-500">
+              Could not read the CSR from the device. Close the modal and try again.
+            </p>
+          </template>
+
+          <!-- Step 2: paste the signed certificate -->
+          <template v-else>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">
+              Paste the signed PEM certificate below to install it on the device.
+            </p>
+
+            <UTextarea
+              v-model="certPem"
+              class="mt-4 w-full font-mono"
+              :rows="10"
+              placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"
+            />
+          </template>
 
           <template #footer>
             <div class="flex justify-end gap-3">
               <UButton variant="ghost" @click="showProvisionModal = false"> Cancel </UButton>
               <UButton
+                v-if="provisionStep === 'csr'"
                 color="primary"
-                :loading="consoleStore.provisioning"
-                @click="handleProvision"
+                :disabled="!consoleStore.csrPem || consoleStore.fetchingCsr"
+                @click="provisionStep = 'cert'"
               >
-                Provision Device
+                Continue
+              </UButton>
+              <UButton
+                v-else
+                color="primary"
+                :disabled="!certPem.trim()"
+                :loading="consoleStore.installingCert"
+                @click="handleInstallCert"
+              >
+                Install Certificate
               </UButton>
             </div>
           </template>
@@ -138,12 +192,32 @@ const consoleStore = useConsoleStore()
 
 const terminalRef = ref<HTMLElement | null>(null)
 const showProvisionModal = ref(false)
+const provisionStep = ref<'csr' | 'cert'>('csr')
+const certPem = ref('')
+const csrCopied = ref(false)
 
 let terminal: Terminal | null = null
 
-const handleProvision = async () => {
-  await consoleStore.provisionDevice()
-  showProvisionModal.value = false
+const openProvisionModal = () => {
+  provisionStep.value = 'csr'
+  certPem.value = ''
+  csrCopied.value = false
+  showProvisionModal.value = true
+  consoleStore.fetchCsr()
+}
+
+const copyCsr = async () => {
+  if (!consoleStore.csrPem) return
+  await navigator.clipboard.writeText(consoleStore.csrPem)
+  csrCopied.value = true
+  setTimeout(() => (csrCopied.value = false), 2000)
+}
+
+const handleInstallCert = async () => {
+  const ok = await consoleStore.installCertificate(certPem.value)
+  if (ok) {
+    showProvisionModal.value = false
+  }
 }
 
 onMounted(() => {

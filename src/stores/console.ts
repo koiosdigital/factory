@@ -4,7 +4,6 @@ import { ref, shallowRef } from 'vue'
 import { useToast } from '@nuxt/ui/composables'
 import type { Terminal } from '@xterm/xterm'
 
-import { useLicensingApi } from '@/lib/api/licensing'
 import { writeChunked } from '@/lib/serial/chunkedWrite'
 import { useAuthStore } from '@/stores/auth'
 import { CryptoState } from '@/types/programmer'
@@ -14,7 +13,6 @@ const ESPRESSIF_VENDOR_ID = 0x303a
 export const useConsoleStore = defineStore('console', () => {
   const authStore = useAuthStore()
   const { isAuthenticated } = storeToRefs(authStore)
-  const licensingApi = useLicensingApi()
   const toast = useToast()
 
   // Connection state
@@ -26,7 +24,9 @@ export const useConsoleStore = defineStore('console', () => {
   const deviceSupportsCrypto = ref(false)
   const cryptoStatus = ref<CryptoState | null>(null)
   const needsProvisioning = ref(false)
-  const provisioning = ref(false)
+  const fetchingCsr = ref(false)
+  const csrPem = ref<string | null>(null)
+  const installingCert = ref(false)
 
   // Internal state
   let terminal: Terminal | null = null
@@ -243,45 +243,51 @@ export const useConsoleStore = defineStore('console', () => {
     })
   }
 
-  const provisionDevice = async () => {
-    if (!isAuthenticated.value) return
+  // Step 1 of provisioning: pull the CSR off the device so the user can copy
+  // it out and have it signed externally (Koios PKI integration comes later).
+  const fetchCsr = async (): Promise<boolean> => {
+    if (!isAuthenticated.value || !connected.value) return false
 
-    const accessToken = authStore.getAccessToken()
-    if (!accessToken) {
-      toast.add({
-        title: 'Not authenticated',
-        description: 'Please sign in to provision devices',
-        color: 'error',
-      })
-      return
-    }
-
-    provisioning.value = true
+    fetchingCsr.value = true
+    csrPem.value = null
 
     try {
-      // Step 1: Request CSR from device (raw PEM text)
-      const csrText = await requestCsr()
-
-      // Step 2: Send the PEM CSR to the licensing API for signing
-      const formData = new FormData()
-      formData.append('csr', csrText)
-
-      const { data, error, response } = await licensingApi.POST('/v1/pki/sign', {
-        body: formData as unknown as { csr: string },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        parseAs: 'text',
+      csrPem.value = await requestCsr()
+      return true
+    } catch (e) {
+      toast.add({
+        title: 'Failed to read CSR',
+        description: e instanceof Error ? e.message : 'Could not read CSR from device',
+        color: 'error',
       })
+      return false
+    } finally {
+      fetchingCsr.value = false
+    }
+  }
 
-      if (error || !response.ok) {
-        throw new Error('Failed to sign CSR')
-      }
+  // Step 2 of provisioning: install a signed certificate pasted by the user.
+  const installCertificate = async (certPem: string): Promise<boolean> => {
+    const pem = certPem.trim()
+    if (
+      !pem.includes('-----BEGIN CERTIFICATE-----') ||
+      !pem.includes('-----END CERTIFICATE-----')
+    ) {
+      toast.add({
+        title: 'Invalid certificate',
+        description: 'Paste a PEM-encoded certificate (BEGIN/END CERTIFICATE block)',
+        color: 'error',
+      })
+      return false
+    }
 
-      // Step 3: Encode certificate as base64 and upload to device in chunks.
+    installingCert.value = true
+
+    try {
+      // Encode certificate as base64 and upload to device in chunks.
       // The device concatenates all chunks and decodes them on commit, so the
       // base64 just needs to be split into pieces small enough for the console.
-      const certBase64 = btoa(data ?? '')
+      const certBase64 = btoa(pem)
       const CHUNK_SIZE = 512
 
       await sendCommandAwaitOk('set_cert_start\n')
@@ -300,17 +306,20 @@ export const useConsoleStore = defineStore('console', () => {
       })
 
       needsProvisioning.value = false
+      csrPem.value = null
 
       // Check status again after a delay
       setTimeout(() => checkCryptoStatus(), 2000)
+      return true
     } catch (e) {
       toast.add({
         title: 'Provisioning failed',
-        description: e instanceof Error ? e.message : 'Could not provision device',
+        description: e instanceof Error ? e.message : 'Could not install certificate',
         color: 'error',
       })
+      return false
     } finally {
-      provisioning.value = false
+      installingCert.value = false
     }
   }
 
@@ -337,14 +346,17 @@ export const useConsoleStore = defineStore('console', () => {
     deviceSupportsCrypto,
     cryptoStatus,
     needsProvisioning,
-    provisioning,
+    fetchingCsr,
+    csrPem,
+    installingCert,
 
     // Actions
     connect,
     disconnect,
     resetChip,
     checkCryptoStatus,
-    provisionDevice,
+    fetchCsr,
+    installCertificate,
     setTerminal,
     getCryptoStatusText,
   }

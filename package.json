@@ -11,7 +11,7 @@
     "format": "prettier --write \"src/**/*.{ts,vue,js,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,js,json,css}\"",
     "typecheck": "vue-tsc --noEmit --skipLibCheck",
-    "generate:api": "pnpm exec openapi-typescript https://firmware.api.koiosdigital.net/swagger.json -o src/types/firmware-api.ts && pnpm exec openapi-typescript https://licensing.api.koiosdigital.net/swagger.json -o src/types/licensing-api.ts"
+    "generate:api": "pnpm exec openapi-typescript https://firmware.api.koiosdigital.net/swagger.json -o src/types/firmware-api.ts"
   },
   "dependencies": {
     "@iconify/vue": "^4.1.1",
