@@ -121,27 +121,29 @@ export const useConsoleStore = defineStore('console', () => {
     consoleAbortController = new AbortController()
     const signal = consoleAbortController.signal
 
-    try {
-      const reader = transport.value.rawRead()
-      let buffer = ''
+    const decoder = new TextDecoder()
+    let buffer = ''
 
-      for await (const chunk of reader) {
-        if (signal.aborted) break
+    const onData = (chunk: Uint8Array) => {
+      const text = decoder.decode(chunk)
+      terminal?.write(text)
+      buffer += text
 
-        const text = new TextDecoder().decode(chunk)
-        terminal?.write(text)
-        buffer += text
+      // Process complete lines
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
 
-        // Process complete lines
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          if (isAuthenticated.value) {
-            handleConsoleLine(line.trim())
-          }
+      for (const line of lines) {
+        if (isAuthenticated.value) {
+          handleConsoleLine(line.trim())
         }
       }
+    }
+
+    try {
+      // esptool-js rawRead is callback-based: it calls onData per chunk and
+      // keeps reading until isClosed() returns true.
+      await transport.value.rawRead(onData, () => signal.aborted)
     } catch {
       // Console loop ended
     }
