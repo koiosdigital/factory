@@ -7,7 +7,6 @@ import { useToast } from '@nuxt/ui/composables'
 import { useFirmwareApi } from '@/lib/api/firmware'
 import { buildVendorFilters, isSerialSupported } from '@/lib/serial/ports'
 import { silentTerminal } from '@/lib/esptool/terminal'
-import { arrayBufferToBinaryString } from '@/lib/esptool/utils'
 import type { FlashState, FileToFlash } from '@/types/flash'
 import type { components } from '@/types/firmware-api'
 
@@ -126,10 +125,9 @@ export const useFlashStore = defineStore('flash', () => {
       }
 
       const buffer = await response.arrayBuffer()
-      const binaryString = arrayBufferToBinaryString(buffer)
 
       files.push({
-        data: binaryString,
+        data: new Uint8Array(buffer),
         address: part.offset!,
       })
 
@@ -193,7 +191,12 @@ export const useFlashStore = defineStore('flash', () => {
         currentFileIndex.value = fileIndex
         flashProgress.value = Math.round((written / total) * 100)
       },
-      calculateMD5Hash: (image) => SparkMD5.hashBinary(image),
+      // esptool-js passes the final (padded, flash-param-patched) image as a
+      // Uint8Array; hash exactly those bytes so it matches the device's MD5.
+      calculateMD5Hash: (image: Uint8Array) =>
+        SparkMD5.ArrayBuffer.hash(
+          image.buffer.slice(image.byteOffset, image.byteOffset + image.byteLength),
+        ),
     })
 
     // Hard reset device after flashing to reboot into new firmware

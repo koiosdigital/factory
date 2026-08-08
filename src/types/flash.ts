@@ -1,6 +1,6 @@
 export type FlashState = 'idle' | 'downloading' | 'flashing' | 'complete' | 'error'
 
 export interface FileToFlash {
-  data: string // Binary string
+  data: Uint8Array // Raw firmware bytes
   address: number // Flash offset
 }
